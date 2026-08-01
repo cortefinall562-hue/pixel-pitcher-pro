@@ -4,6 +4,7 @@ import { lazy, Suspense, useMemo, useState } from "react";
 import type { BrowStyle, CoachConfig, HairColor, HairStyle, Outfit } from "@/game/coachScene";
 
 const CoachCanvas = lazy(() => import("@/components/CoachCanvas"));
+const SeasonHub = lazy(() => import("@/components/SeasonHub"));
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Screen = "menu" | "settings" | "editor";
+type Screen = "menu" | "settings" | "editor" | "season";
 
 const HAIR_LABELS = ["Pelado", "Pelo corto de bloques", "Flequillo de bloques"];
 const BROW_LABELS = ["Normales", "Enojadas", "Gruesas"];
@@ -50,6 +51,16 @@ function Index() {
 
   const cycle = <T extends number>(v: T, dir: number): T =>
     (((v + dir + 3) % 3) as T);
+
+  if (screen === "season") {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-pitch-night" />}>
+        <div className="animate-fade-in">
+          <SeasonHub managerName={name.trim() || "Mánager Gallardo"} />
+        </div>
+      </Suspense>
+    );
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-pitch-night lg:h-screen lg:flex-row lg:overflow-hidden">
@@ -181,7 +192,9 @@ function Index() {
               </div>
             </div>
 
-            <button className="btn-play w-full">GUARDAR Y CONTINUAR</button>
+            <button className="btn-play w-full" onClick={() => setScreen("season")}>
+              GUARDAR Y CONTINUAR
+            </button>
           </div>
         )}
       </section>
