@@ -2,9 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense, useMemo, useState } from "react";
 import type { BrowStyle, CoachConfig, HairColor, HairStyle, Outfit } from "@/game/coachScene";
+import { CLUBS, DEFAULT_CLUB_ID, formatBudget, getClub } from "@/game/clubs";
+import type { MatchResult } from "@/components/MatchScreen";
 
 const CoachCanvas = lazy(() => import("@/components/CoachCanvas"));
 const SeasonHub = lazy(() => import("@/components/SeasonHub"));
+const MatchScreen = lazy(() => import("@/components/MatchScreen"));
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
