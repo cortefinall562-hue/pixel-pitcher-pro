@@ -1,17 +1,22 @@
 import { useState } from "react";
 import { Globe, Heart, Mail, X, Zap } from "lucide-react";
+import { CLUBS, formatBudget, type Club } from "@/game/clubs";
+import type { MatchResult } from "@/components/MatchScreen";
 
-const CREST_COLORS: Record<string, [string, string]> = {
-  "FC Barcelona": ["#a50044", "#004d98"],
-  "Real Madrid": ["#f0f0f0", "#00529f"],
-  "Atlético de Madrid": ["#cb3524", "#262e62"],
+const EXTRA_CRESTS: Record<string, [string, string]> = {
   "Sevilla FC": ["#d8262f", "#f4f4f4"],
   "Valencia CF": ["#f5a11d", "#111111"],
   "Athletic Club": ["#ee2523", "#ffffff"],
 };
 
+function crestColors(team: string): [string, string] {
+  return (
+    CLUBS.find((c) => c.name === team)?.crest ?? EXTRA_CRESTS[team] ?? ["#3ddc84", "#1f2937"]
+  );
+}
+
 function Crest({ team, size = 64 }: { team: string; size?: number }) {
-  const [a, b] = CREST_COLORS[team] ?? ["#3ddc84", "#1f2937"];
+  const [a, b] = crestColors(team);
   const initials = team
     .split(" ")
     .filter((w) => w.length > 2)
@@ -38,12 +43,22 @@ function Crest({ team, size = 64 }: { team: string; size?: number }) {
   );
 }
 
-const FIXTURES = [
-  { round: "Jornada 1", home: "FC Barcelona", away: "Real Madrid", date: "Sáb 21:00" },
-  { round: "Jornada 2", home: "Sevilla FC", away: "FC Barcelona", date: "Mié 19:30" },
-  { round: "Jornada 3", home: "FC Barcelona", away: "Valencia CF", date: "Dom 17:00" },
-  { round: "Jornada 4", home: "Athletic Club", away: "FC Barcelona", date: "Sáb 16:15" },
-];
+const DATES = ["Sáb 21:00", "Mié 19:30", "Dom 17:00", "Sáb 16:15"];
+const FILLERS = ["Sevilla FC", "Valencia CF", "Athletic Club"];
+
+function buildFixtures(club: Club) {
+  const rivals = [
+    ...CLUBS.filter((c) => c.id !== club.id).map((c) => c.name),
+    ...FILLERS,
+  ].slice(0, 4);
+  return rivals.map((away, i) => ({
+    round: `Jornada ${i + 1}`,
+    home: i % 2 === 0 ? club.name : away,
+    away: i % 2 === 0 ? away : club.name,
+    rival: away,
+    date: DATES[i]!,
+  }));
+}
 
 const EMAILS = [
   {
@@ -60,7 +75,18 @@ const EMAILS = [
   },
 ];
 
-const NEWS = [
+interface NewsItem {
+  outlet: string;
+  handle: string;
+  initials: string;
+  accent: string;
+  headline: string;
+  body: string;
+  time: string;
+  likes: number;
+}
+
+const NEWS: NewsItem[] = [
   {
     outlet: "Fabrizio Romano",
     handle: "@FabrizioRomano",
@@ -93,7 +119,7 @@ const NEWS = [
   },
 ];
 
-function NewsCard({ item }: { item: (typeof NEWS)[number] }) {
+function NewsCard({ item }: { item: NewsItem }) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(item.likes);
 
@@ -138,10 +164,42 @@ function NewsCard({ item }: { item: (typeof NEWS)[number] }) {
   );
 }
 
-export default function SeasonHub({ managerName }: { managerName: string }) {
+export default function SeasonHub({
+  managerName,
+  club,
+  lastResult,
+  onPlayMatch,
+}: {
+  managerName: string;
+  club: Club;
+  lastResult: MatchResult | null;
+  onPlayMatch: (rivalName: string) => void;
+}) {
   const [showOnline, setShowOnline] = useState(false);
-  const club = "FC Barcelona";
-  const next = FIXTURES[0]!;
+  const fixtures = buildFixtures(club);
+  const next = fixtures[0]!;
+
+  const resultNews: NewsItem[] = lastResult
+    ? [
+        {
+          outlet: "Táctica FC Live",
+          handle: "@tacticafclive",
+          initials: "TL",
+          accent: "linear-gradient(160deg,#166534,#0b1120)",
+          headline: `RESULTADO: ${club.name} ${lastResult.team} - ${lastResult.rival} ${lastResult.rivalName}`,
+          body:
+            lastResult.team > lastResult.rival
+              ? `Victoria del ${club.name} con ${managerName} en el banquillo. La afición estalla.`
+              : lastResult.team === lastResult.rival
+                ? `Empate en un partido intenso. ${managerName} pide más contundencia.`
+                : `Derrota dura. ${managerName} asume la responsabilidad ante la prensa.`,
+          time: "Ahora mismo",
+          likes: 12045,
+        },
+      ]
+    : [];
+
+  const feed = [...resultNews, ...NEWS];
 
   return (
     <div className="min-h-screen bg-pitch-night pb-10">
@@ -158,11 +216,11 @@ export default function SeasonHub({ managerName }: { managerName: string }) {
             </div>
             <div>
               <p className="field-label">Club</p>
-              <p className="text-sm font-semibold text-foreground">{club}</p>
+              <p className="text-sm font-semibold text-foreground">{club.name}</p>
             </div>
             <div>
               <p className="field-label">Presupuesto</p>
-              <p className="text-sm font-semibold text-turf">$20,000,000</p>
+              <p className="text-sm font-semibold text-turf">{formatBudget(club.budget)}</p>
             </div>
           </div>
           <button
@@ -181,6 +239,12 @@ export default function SeasonHub({ managerName }: { managerName: string }) {
             <div className="pointer-events-none absolute inset-0 opacity-70 [background:radial-gradient(circle_at_50%_0%,color-mix(in_oklab,var(--color-turf)_25%,transparent),transparent_60%)]" />
             <div className="relative">
               <p className="field-label">Siguiente partido · {next.round}</p>
+              {lastResult && (
+                <p className="mt-2 text-xs tracking-widest text-turf">
+                  ÚLTIMO RESULTADO: {club.name} {lastResult.team} - {lastResult.rival}{" "}
+                  {lastResult.rivalName}
+                </p>
+              )}
               <div className="mt-5 flex items-center justify-center gap-6 sm:gap-12">
                 <div className="text-center">
                   <Crest team={next.home} size={84} />
@@ -197,7 +261,10 @@ export default function SeasonHub({ managerName }: { managerName: string }) {
                   <p className="mt-3 text-sm font-bold text-foreground">{next.away}</p>
                 </div>
               </div>
-              <button className="btn-play mt-7 flex w-full items-center justify-center gap-3">
+              <button
+                onClick={() => onPlayMatch(next.rival)}
+                className="btn-play mt-7 flex w-full items-center justify-center gap-3"
+              >
                 <Zap size={22} /> JUGAR PARTIDO
               </button>
             </div>
@@ -206,7 +273,7 @@ export default function SeasonHub({ managerName }: { managerName: string }) {
           <section className="panel p-5">
             <p className="field-label">Calendario</p>
             <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
-              {FIXTURES.map((f) => (
+              {fixtures.map((f) => (
                 <div
                   key={f.round}
                   className="min-w-[150px] flex-1 rounded-xl border border-border bg-secondary/60 p-3 text-center transition-colors hover:border-turf/60"
@@ -256,7 +323,7 @@ export default function SeasonHub({ managerName }: { managerName: string }) {
           <p className="field-label mb-3">Feed de noticias</p>
           <div className="panel aspect-[9/16] w-full overflow-hidden p-2">
             <div className="h-full snap-y snap-mandatory space-y-2 overflow-y-auto">
-              {NEWS.map((n) => (
+              {feed.map((n) => (
                 <div key={n.outlet} className="h-full">
                   <NewsCard item={n} />
                 </div>
