@@ -29,7 +29,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Screen = "menu" | "settings" | "editor" | "season";
+type Screen = "menu" | "settings" | "editor" | "season" | "match";
 
 const HAIR_LABELS = ["Pelado", "Pelo corto de bloques", "Flequillo de bloques"];
 const BROW_LABELS = ["Normales", "Enojadas", "Gruesas"];
@@ -47,6 +47,15 @@ function Index() {
   const [hairColor, setHairColor] = useState<HairColor>("black");
   const [brows, setBrows] = useState<BrowStyle>(0);
   const [outfit, setOutfit] = useState<Outfit>(0);
+  const [clubId, setClubId] = useState<string>(DEFAULT_CLUB_ID);
+  const [rivalName, setRivalName] = useState<string>("");
+  const [lastResult, setLastResult] = useState<MatchResult | null>(null);
+
+  const club = getClub(clubId);
+  const rival = useMemo(
+    () => CLUBS.find((c) => c.name === rivalName) ?? CLUBS.find((c) => c.id !== club.id)!,
+    [rivalName, club.id],
+  );
 
   const config = useMemo<CoachConfig>(
     () => ({ hairStyle, hairColor, brows, outfit }),
@@ -56,15 +65,43 @@ function Index() {
   const cycle = <T extends number>(v: T, dir: number): T =>
     (((v + dir + 3) % 3) as T);
 
+  const managerName = name.trim() || "Mánager Gallardo";
+
+  if (screen === "match") {
+    return (
+      <ClientOnly fallback={<div className="min-h-screen bg-sky" />}>
+        <Suspense fallback={<div className="min-h-screen bg-sky" />}>
+          <MatchScreen
+            club={club}
+            rival={rival}
+            onExit={(result) => {
+              setLastResult(result);
+              setScreen("season");
+            }}
+          />
+        </Suspense>
+      </ClientOnly>
+    );
+  }
+
   if (screen === "season") {
     return (
       <Suspense fallback={<div className="min-h-screen bg-pitch-night" />}>
         <div className="animate-fade-in">
-          <SeasonHub managerName={name.trim() || "Mánager Gallardo"} />
+          <SeasonHub
+            managerName={managerName}
+            club={club}
+            lastResult={lastResult}
+            onPlayMatch={(r) => {
+              setRivalName(r);
+              setScreen("match");
+            }}
+          />
         </div>
       </Suspense>
     );
   }
+
 
   return (
     <main className="flex min-h-screen flex-col bg-pitch-night lg:h-screen lg:flex-row lg:overflow-hidden">
