@@ -51,8 +51,8 @@ export function createCoachScene(canvas: HTMLCanvasElement) {
   scene.fog = new THREE.Fog(0x8fd8f7, 14, 30);
 
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-  camera.position.set(0, 2.6, 7.2);
-  camera.lookAt(0, 1.7, 0);
+  camera.position.set(0, 3.0, 9.0);
+  camera.lookAt(0, 1.85, 0);
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0x88bb77, 1.05));
   const sun = new THREE.DirectionalLight(0xfff3d6, 0.85);
@@ -168,7 +168,7 @@ export function createCoachScene(canvas: HTMLCanvasElement) {
 
   // pelota de bloques al lado
   const ball = box(0.5, 0.5, 0.5, 0xffffff);
-  ball.position.set(1.6, 0.3, 0.9);
+  ball.position.set(2.1, 0.3, 1.4);
   ball.rotation.y = 0.4;
   scene.add(ball);
   const ballSpot = box(0.2, 0.2, 0.52, 0x2b2b33);
@@ -191,7 +191,7 @@ export function createCoachScene(canvas: HTMLCanvasElement) {
       const top = box(1.0, 0.26, 0.9, c);
       top.position.y = 0.48;
       const fringe = box(1.0, 0.26, 0.2, c);
-      fringe.position.set(0, 0.26, 0.36);
+      fringe.position.set(0, 0.4, 0.36);
       const sideL = box(0.14, 0.34, 0.86, c);
       sideL.position.set(-0.44, 0.2, 0);
       const sideR = sideL.clone();
