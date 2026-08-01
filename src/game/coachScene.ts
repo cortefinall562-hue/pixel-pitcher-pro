@@ -65,7 +65,7 @@ export function createCoachScene(canvas: HTMLCanvasElement) {
   const greens = [0x4fbf5f, 0x45b055, 0x58c96a];
   for (let x = -9; x <= 9; x++) {
     for (let z = -7; z <= 5; z++) {
-      const m = new THREE.Mesh(tileGeo, mat(greens[(x + z + 20) % 3]));
+      const m = new THREE.Mesh(tileGeo, mat(greens[(x + z + 20) % 3]!));
       m.position.set(x, -0.25 + (Math.abs(x) > 6 ? 0.02 : 0), z);
       ground.add(m);
     }
@@ -218,7 +218,7 @@ export function createCoachScene(canvas: HTMLCanvasElement) {
   }
 
   function setOutfit(index: Outfit) {
-    const o = OUTFITS[index];
+    const o = OUTFITS[index]!;
     (torso.material as THREE.MeshLambertMaterial).color.setHex(o.torso);
     (detail.material as THREE.MeshLambertMaterial).color.setHex(o.detail);
     for (const a of [armL, armR])
