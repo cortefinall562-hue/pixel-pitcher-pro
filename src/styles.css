@@ -59,6 +59,102 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-turf: var(--turf);
+  --color-turf-glow: var(--turf-glow);
+  --color-sky: var(--sky);
+  --color-pitch-night: var(--pitch-night);
+  --font-display: "Bungee", system-ui, sans-serif;
+  --font-sans: "Outfit", system-ui, sans-serif;
+}
+
+@utility btn-play {
+  border-radius: 1rem;
+  padding: 1rem 1.5rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  color: oklch(0.16 0.03 150);
+  background: linear-gradient(180deg, var(--turf-glow), var(--turf));
+  box-shadow: 0 6px 0 color-mix(in oklab, var(--turf) 55%, black), 0 0 0 rgb(0 0 0 / 0);
+  transition: transform 0.15s ease, box-shadow 0.25s ease, filter 0.25s ease;
+  &:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 6px 0 color-mix(in oklab, var(--turf) 55%, black),
+      0 0 34px color-mix(in oklab, var(--turf-glow) 70%, transparent);
+  }
+  &:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 color-mix(in oklab, var(--turf) 55%, black);
+  }
+}
+
+@utility btn-ghost {
+  border-radius: 1rem;
+  padding: 0.9rem 1.5rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--muted-foreground);
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  transition: color 0.2s ease, background 0.2s ease;
+  &:hover {
+    color: var(--foreground);
+    background: color-mix(in oklab, var(--secondary) 70%, white 6%);
+  }
+}
+
+@utility btn-step {
+  height: 2.75rem;
+  width: 2.75rem;
+  flex: none;
+  border-radius: 0.85rem;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  font-weight: 700;
+  color: var(--foreground);
+  transition: background 0.2s ease, transform 0.15s ease;
+  &:hover {
+    background: color-mix(in oklab, var(--turf) 30%, var(--secondary));
+    transform: scale(1.05);
+  }
+}
+
+@utility panel {
+  border-radius: 1.25rem;
+  background: color-mix(in oklab, var(--card) 85%, transparent);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+@utility chip {
+  border-radius: 0.8rem;
+  padding: 0.6rem 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--muted-foreground);
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+  &:hover {
+    color: var(--foreground);
+  }
+}
+
+@utility chip-active {
+  color: oklch(0.16 0.03 150);
+  background: var(--turf);
+  border-color: var(--turf-glow);
+}
+
+@utility field-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }
 
 :root {
@@ -95,6 +191,31 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+}
+
+:root {
+  --radius: 1rem;
+  --turf: oklch(0.78 0.19 145);
+  --turf-glow: oklch(0.88 0.2 150);
+  --sky: oklch(0.87 0.08 220);
+  --pitch-night: oklch(0.19 0.03 260);
+  --background: oklch(0.19 0.03 260);
+  --foreground: oklch(0.98 0.005 250);
+  --card: oklch(0.24 0.03 262);
+  --card-foreground: oklch(0.98 0.005 250);
+  --popover: oklch(0.24 0.03 262);
+  --popover-foreground: oklch(0.98 0.005 250);
+  --primary: oklch(0.78 0.19 145);
+  --primary-foreground: oklch(0.18 0.03 150);
+  --secondary: oklch(0.28 0.025 262);
+  --secondary-foreground: oklch(0.98 0.005 250);
+  --muted: oklch(0.28 0.025 262);
+  --muted-foreground: oklch(0.72 0.02 260);
+  --accent: oklch(0.32 0.03 262);
+  --accent-foreground: oklch(0.98 0.005 250);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: var(--turf);
 }
 
 .dark {
@@ -138,6 +259,7 @@
   }
 
   body {
+    font-family: var(--font-sans);
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
