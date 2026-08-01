@@ -168,7 +168,7 @@ export function createCoachScene(canvas: HTMLCanvasElement) {
 
   // pelota de bloques al lado
   const ball = box(0.5, 0.5, 0.5, 0xffffff);
-  ball.position.set(2.1, 0.3, 1.4);
+  ball.position.set(2.3, 0.3, -0.4);
   ball.rotation.y = 0.4;
   scene.add(ball);
   const ballSpot = box(0.2, 0.2, 0.52, 0x2b2b33);
