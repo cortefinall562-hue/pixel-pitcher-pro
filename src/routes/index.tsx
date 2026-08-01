@@ -233,6 +233,29 @@ function Index() {
               </div>
             </div>
 
+            <div className="panel space-y-3 p-5">
+              <label htmlFor="club-select" className="field-label">
+                Elegir Club de Inicio
+              </label>
+              <select
+                id="club-select"
+                value={clubId}
+                onChange={(e) => setClubId(e.target.value)}
+                className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-sm font-semibold text-foreground focus:border-turf focus:outline-none"
+              >
+                {CLUBS.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} — Presupuesto: {formatBudget(c.budget)}
+                  </option>
+                ))}
+              </select>
+              <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Presupuesto inicial</span>
+                <span className="font-display text-turf">{formatBudget(club.budget)}</span>
+              </div>
+            </div>
+
+
             <button className="btn-play w-full" onClick={() => setScreen("season")}>
               GUARDAR Y CONTINUAR
             </button>
