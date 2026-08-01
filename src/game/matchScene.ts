@@ -370,8 +370,8 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     // ---- cámara sigue al héroe ----
     const camTarget = new THREE.Vector3(
       hero.root.position.x * 0.6,
-      11,
-      hero.root.position.z * 0.6 + 17,
+      14,
+      hero.root.position.z * 0.6 + 21,
     );
     camera.position.lerp(camTarget, Math.min(1, dt * 2.5));
     camera.lookAt(hero.root.position.x * 0.5, 1, hero.root.position.z * 0.5);
@@ -384,7 +384,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     renderer.render(scene, camera);
   }
 
-  camera.position.set(0, 11, 17);
+  camera.position.set(0, 14, 21);
   frame();
 
   function resize() {
