@@ -321,8 +321,8 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       confCol[i * 3 + 1] = tmpColor.g;
       confCol[i * 3 + 2] = tmpColor.b;
     }
-    confGeo.attributes.position!.needsUpdate = true;
-    confGeo.attributes.color!.needsUpdate = true;
+    confGeo.attributes['position']!.needsUpdate = true;
+    confGeo.attributes['color']!.needsUpdate = true;
     confetti.visible = true;
   }
 
@@ -452,12 +452,12 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     if (confetti.visible) {
       let alive = false;
       for (let i = 0; i < CONFETTI; i++) {
-        confPos[i * 3] += confVel[i * 3]! * dt;
-        confPos[i * 3 + 1] += confVel[i * 3 + 1]! * dt;
-        confPos[i * 3 + 2] += confVel[i * 3 + 2]! * dt;
+        confPos[i * 3] = confPos[i * 3]! + confVel[i * 3]! * dt;
+        confPos[i * 3 + 1] = confPos[i * 3 + 1]! + confVel[i * 3 + 1]! * dt;
+        confPos[i * 3 + 2] = confPos[i * 3 + 2]! + confVel[i * 3 + 2]! * dt;
         if (confPos[i * 3 + 1]! > 0.2) alive = true;
       }
-      confGeo.attributes.position!.needsUpdate = true;
+      confGeo.attributes['position']!.needsUpdate = true;
       if (!alive || celebrating <= 0) confetti.visible = false;
     }
 
@@ -570,9 +570,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     chase(mate, 3.4, FIELD_X);
 
     // ---- acciones sobre la pelota ----
-    const hb = new THREE.Vector3().subSubVectorsSafe?.length
-      ? new THREE.Vector3()
-      : new THREE.Vector3().subVectors(ball.position, hero.root.position);
+    const hb = new THREE.Vector3().subVectors(ball.position, hero.root.position);
     hb.y = 0;
     const ballDist = hb.length();
     const nearBall = ballDist < 2.6;
