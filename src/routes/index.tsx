@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense, useMemo, useState } from "react";
 import type { BrowStyle, CoachConfig, HairColor, HairStyle, Outfit } from "@/game/coachScene";
-import { CLUBS, DEFAULT_CLUB_ID, formatBudget, getClub } from "@/game/clubs";
+import { CLUBS, DEFAULT_CLUB_ID, clubsByLeague, formatBudget, getClub } from "@/game/clubs";
 import type { MatchResult } from "@/components/MatchScreen";
 
 const CoachCanvas = lazy(() => import("@/components/CoachCanvas"));
@@ -243,16 +243,21 @@ function Index() {
                 onChange={(e) => setClubId(e.target.value)}
                 className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-sm font-semibold text-foreground focus:border-turf focus:outline-none"
               >
-                {CLUBS.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} — Presupuesto: {formatBudget(c.budget)}
-                  </option>
+                {clubsByLeague().map((group) => (
+                  <optgroup key={group.league} label={group.league}>
+                    {group.clubs.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} — {formatBudget(c.budget)}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
               <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">Presupuesto inicial</span>
+                <span className="text-muted-foreground">{club.league}</span>
                 <span className="font-display text-turf">{formatBudget(club.budget)}</span>
               </div>
+
             </div>
 
 
