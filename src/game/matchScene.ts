@@ -6,6 +6,7 @@ export interface MatchOptions {
   rivalShirt: number;
   rivalShorts: number;
   onScore: (side: "team" | "rival") => void;
+  onGoal?: (side: "team" | "rival") => void;
   onClock: (minute: number) => void;
   onEnd: () => void;
 }
@@ -14,6 +15,7 @@ const SKIN = 0xf0b98a;
 const FIELD_X = 20;
 const FIELD_Z = 13;
 const GOAL_HALF = 3.4;
+const CELEBRATION_TIME = 3;
 
 function mat(color: number) {
   return new THREE.MeshLambertMaterial({ color });
@@ -95,9 +97,9 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x8fd8f7);
-  scene.fog = new THREE.Fog(0x8fd8f7, 45, 80);
+  scene.fog = new THREE.Fog(0x8fd8f7, 60, 110);
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 250);
   scene.add(new THREE.HemisphereLight(0xffffff, 0x77aa66, 1.05));
   const sun = new THREE.DirectionalLight(0xfff3d6, 0.8);
   sun.position.set(10, 18, 8);
@@ -128,10 +130,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   addLine(0.22, FIELD_Z * 2, -FIELD_X, 0);
   addLine(0.22, FIELD_Z * 2, FIELD_X, 0);
   addLine(0.22, FIELD_Z * 2, 0, 0);
-  const circle = new THREE.Mesh(
-    new THREE.TorusGeometry(4, 0.11, 6, 40),
-    mat(0xffffff),
-  );
+  const circle = new THREE.Mesh(new THREE.TorusGeometry(4, 0.11, 6, 40), mat(0xffffff));
   circle.rotation.x = Math.PI / 2;
   circle.position.y = lineY;
   pitch.add(circle);
@@ -141,7 +140,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     addLine(5, 0.22, s * (FIELD_X - 2.5), 5);
   }
 
-  // arcos de cilindros blancos
+  // arcos de cilindros blancos + red simple
   function goal(side: number) {
     const g = new THREE.Group();
     const postL = cyl(0.16, 2.6, 0xffffff);
@@ -151,12 +150,82 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     const bar = cyl(0.16, GOAL_HALF * 2, 0xffffff);
     bar.rotation.x = Math.PI / 2;
     bar.position.y = 2.6;
-    g.add(postL, postR, bar);
+    const net = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 2.6, GOAL_HALF * 2),
+      new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 }),
+    );
+    net.position.set(side * 1.4, 1.3, 0);
+    g.add(postL, postR, bar, net);
     g.position.x = side * FIELD_X;
     pitch.add(g);
   }
   goal(-1);
   goal(1);
+
+  // ---- Estadio: gradas ----
+  const stands = new THREE.Group();
+  scene.add(stands);
+  const standMatA = mat(0x5a6472);
+  const standMatB = mat(0x394456);
+  const STAND_STEPS = 5;
+  const seatRows: { x: number; z: number; y: number }[] = [];
+
+  function buildStand(axis: "x" | "z", sign: number) {
+    const long = axis === "x" ? (FIELD_Z + 8) * 2 : (FIELD_X + 8) * 2;
+    for (let s = 0; s < STAND_STEPS; s++) {
+      const y = 0.6 + s * 1.05;
+      const off = (axis === "x" ? FIELD_X + 8 : FIELD_Z + 8) + s * 2.1;
+      const step = new THREE.Mesh(
+        axis === "x" ? new THREE.BoxGeometry(2.1, y * 2, long) : new THREE.BoxGeometry(long, y * 2, 2.1),
+        s % 2 === 0 ? standMatA : standMatB,
+      );
+      if (axis === "x") step.position.set(sign * off, 0, 0);
+      else step.position.set(0, 0, sign * off);
+      stands.add(step);
+
+      // filas de asientos (posiciones para la hinchada)
+      const count = Math.floor(long / 1.35);
+      for (let i = 0; i < count; i++) {
+        const t = -long / 2 + 0.7 + i * 1.35;
+        const px = axis === "x" ? sign * off : t;
+        const pz = axis === "x" ? t : sign * off;
+        seatRows.push({ x: px, z: pz, y: y + 0.45 });
+      }
+    }
+  }
+  buildStand("x", -1);
+  buildStand("x", 1);
+  buildStand("z", -1);
+  buildStand("z", 1);
+
+  // ---- Hinchada (InstancedMesh optimizado) ----
+  const FAN_COLORS = [
+    0xff4d4d, 0xffd93d, 0x4dd2ff, 0xffffff, 0x8affc1, 0xff8ae0, 0xffa64d, 0x9b8aff,
+  ];
+  const fanCount = seatRows.length;
+  const crowd = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.55, 0.75, 0.55),
+    new THREE.MeshLambertMaterial(),
+    fanCount,
+  );
+  crowd.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const fanPhase = new Float32Array(fanCount);
+  const fanBase = new Float32Array(fanCount * 3);
+  const tmpMat = new THREE.Matrix4();
+  const tmpColor = new THREE.Color();
+  for (let i = 0; i < fanCount; i++) {
+    const s = seatRows[i]!;
+    fanBase[i * 3] = s.x;
+    fanBase[i * 3 + 1] = s.y;
+    fanBase[i * 3 + 2] = s.z;
+    fanPhase[i] = Math.random() * Math.PI * 2;
+    tmpMat.makeTranslation(s.x, s.y, s.z);
+    crowd.setMatrixAt(i, tmpMat);
+    crowd.setColorAt(i, tmpColor.setHex(FAN_COLORS[i % FAN_COLORS.length]!));
+  }
+  crowd.instanceMatrix.needsUpdate = true;
+  if (crowd.instanceColor) crowd.instanceColor.needsUpdate = true;
+  scene.add(crowd);
 
   // nubes
   const clouds = new THREE.Group();
@@ -167,7 +236,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       b.position.set(j * 1.8 - 1.8, j === 1 ? 0.5 : 0, 0);
       c.add(b);
     }
-    c.position.set(-24 + i * 9, 12 + (i % 3) * 2, -26 - (i % 2) * 6);
+    c.position.set(-24 + i * 9, 20 + (i % 3) * 2, -40 - (i % 2) * 6);
     clouds.add(c);
   }
   scene.add(clouds);
@@ -181,8 +250,9 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   );
   ball.add(shell);
   const patchGeo = new THREE.IcosahedronGeometry(ballR * 0.42, 0);
+  const patchMat = new THREE.MeshLambertMaterial({ color: 0x22252c, flatShading: true });
   for (let i = 0; i < 8; i++) {
-    const p = new THREE.Mesh(patchGeo, new THREE.MeshLambertMaterial({ color: 0x22252c, flatShading: true }));
+    const p = new THREE.Mesh(patchGeo, patchMat);
     const a = i * 2.4;
     const y = -0.85 + (i / 7) * 1.7;
     const r = Math.sqrt(Math.max(0.02, 1 - y * y));
@@ -204,33 +274,77 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   rival2.root.position.set(9, 0, 4);
   for (const p of [hero, mate, rival1, rival2]) scene.add(p.root);
 
-  // marcador de selección bajo el héroe
   const marker = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.09, 6, 24), mat(0xfdf14a));
   marker.rotation.x = Math.PI / 2;
   scene.add(marker);
 
+  // ---- Estela de turbo (pool reutilizable) ----
+  const TRAIL = 14;
+  const trailMat = new THREE.MeshBasicMaterial({ color: 0x9ef0ff, transparent: true, opacity: 0.6 });
+  const trail: THREE.Mesh[] = [];
+  const trailLife = new Float32Array(TRAIL);
+  const trailGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+  for (let i = 0; i < TRAIL; i++) {
+    const m = new THREE.Mesh(trailGeo, trailMat.clone());
+    m.visible = false;
+    trail.push(m);
+    scene.add(m);
+  }
+  let trailIdx = 0;
+  let trailTimer = 0;
+
+  // ---- Confeti (Points) ----
+  const CONFETTI = 220;
+  const confPos = new Float32Array(CONFETTI * 3);
+  const confVel = new Float32Array(CONFETTI * 3);
+  const confCol = new Float32Array(CONFETTI * 3);
+  const confGeo = new THREE.BufferGeometry();
+  confGeo.setAttribute("position", new THREE.BufferAttribute(confPos, 3));
+  confGeo.setAttribute("color", new THREE.BufferAttribute(confCol, 3));
+  const confetti = new THREE.Points(
+    confGeo,
+    new THREE.PointsMaterial({ size: 0.3, vertexColors: true, transparent: true }),
+  );
+  confetti.visible = false;
+  scene.add(confetti);
+
+  function burstConfetti(at: THREE.Vector3) {
+    for (let i = 0; i < CONFETTI; i++) {
+      confPos[i * 3] = at.x + (Math.random() - 0.5) * 6;
+      confPos[i * 3 + 1] = at.y + 5 + Math.random() * 6;
+      confPos[i * 3 + 2] = at.z + (Math.random() - 0.5) * 6;
+      confVel[i * 3] = (Math.random() - 0.5) * 1.6;
+      confVel[i * 3 + 1] = -1.5 - Math.random() * 2;
+      confVel[i * 3 + 2] = (Math.random() - 0.5) * 1.6;
+      tmpColor.setHex(FAN_COLORS[i % FAN_COLORS.length]!);
+      confCol[i * 3] = tmpColor.r;
+      confCol[i * 3 + 1] = tmpColor.g;
+      confCol[i * 3 + 2] = tmpColor.b;
+    }
+    confGeo.attributes.position!.needsUpdate = true;
+    confGeo.attributes.color!.needsUpdate = true;
+    confetti.visible = true;
+  }
+
   // ---- Controles ----
   const keys = new Set<string>();
+  const MOVE_KEYS = ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"];
+  const ACTION_KEYS = ["e", "f", "q", " "];
+  let wantShoot = false;
+  let wantPass = false;
+  let wantDodge = false;
+
   const onKeyDown = (e: KeyboardEvent) => {
-    if (
-      [
-        "ArrowUp",
-        "ArrowDown",
-        "ArrowLeft",
-        "ArrowRight",
-        "w",
-        "a",
-        "s",
-        "d",
-        "W",
-        "A",
-        "S",
-        "D",
-      ].includes(e.key)
-    ) {
-      e.preventDefault();
-      keys.add(e.key.toLowerCase());
+    const k = e.key.toLowerCase();
+    if (MOVE_KEYS.includes(k) || ACTION_KEYS.includes(k)) e.preventDefault();
+    if (e.repeat) {
+      if (MOVE_KEYS.includes(k) || k === "f") keys.add(k);
+      return;
     }
+    if (MOVE_KEYS.includes(k) || ACTION_KEYS.includes(k)) keys.add(k);
+    if (k === "e") wantShoot = true;
+    if (k === " ") wantPass = true;
+    if (k === "q") wantDodge = true;
   };
   const onKeyUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
   window.addEventListener("keydown", onKeyDown);
@@ -251,6 +365,23 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     p.armR.rotation.x = s * amp * 0.8;
   }
 
+  function celebrate(p: Player, t: number) {
+    p.root.position.y = Math.abs(Math.sin(t * 7)) * 0.9;
+    p.root.rotation.y += 0.09;
+    p.armL.rotation.x = 0;
+    p.armR.rotation.x = 0;
+    p.armL.rotation.z = 2.5;
+    p.armR.rotation.z = -2.5;
+    p.legL.rotation.x = 0.3;
+    p.legR.rotation.x = -0.3;
+  }
+
+  function resetPose(p: Player) {
+    p.root.position.y = 0;
+    p.armL.rotation.z = 0;
+    p.armR.rotation.z = 0;
+  }
+
   function faceMove(p: Player, dt: number) {
     if (p.vel.lengthSq() > 0.0004) {
       const target = Math.atan2(p.vel.x, p.vel.z);
@@ -263,6 +394,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
 
   function kick(from: THREE.Vector3, dir: THREE.Vector3, power: number) {
     const d = dir.lengthSq() > 0.001 ? dir.clone().normalize() : new THREE.Vector3(1, 0, 0);
+    d.y = 0;
     ballVel.copy(d).multiplyScalar(power);
     ball.position.x = from.x + d.x * (ballR + 0.45);
     ball.position.z = from.z + d.z * (ballR + 0.45);
@@ -275,19 +407,82 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     mate.root.position.set(-9, 0, -5);
     rival1.root.position.set(5, 0, -3);
     rival2.root.position.set(9, 0, 4);
+    for (const p of [hero, mate, rival1, rival2]) {
+      p.vel.set(0, 0, 0);
+      resetPose(p);
+    }
   }
 
   // ---- Reloj / estado ----
   let minute = 0;
   let lastReported = -1;
   let finished = false;
+  let celebrating = 0;
+  let dodgeTimer = 0;
+  const dodgeDir = new THREE.Vector3();
 
   const clock = new THREE.Clock();
   let raf = 0;
+  const camLook = new THREE.Vector3(0, 1, 0);
+
+  function scoreGoal(side: "team" | "rival") {
+    if (finished) return;
+    opts.onScore(side);
+    opts.onGoal?.(side);
+    celebrating = CELEBRATION_TIME;
+    ballVel.set(0, 0, 0);
+    burstConfetti(hero.root.position);
+  }
 
   function frame() {
     raf = requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta());
+    const t = clock.elapsedTime;
+
+    // hinchada saltando
+    for (let i = 0; i < fanCount; i++) {
+      const ph = fanPhase[i]!;
+      const hop = Math.max(0, Math.sin(t * 3 + ph)) * (celebrating > 0 ? 0.75 : 0.35);
+      tmpMat.makeTranslation(fanBase[i * 3]!, fanBase[i * 3 + 1]! + hop, fanBase[i * 3 + 2]!);
+      crowd.setMatrixAt(i, tmpMat);
+    }
+    crowd.instanceMatrix.needsUpdate = true;
+
+    // confeti
+    if (confetti.visible) {
+      let alive = false;
+      for (let i = 0; i < CONFETTI; i++) {
+        confPos[i * 3] += confVel[i * 3]! * dt;
+        confPos[i * 3 + 1] += confVel[i * 3 + 1]! * dt;
+        confPos[i * 3 + 2] += confVel[i * 3 + 2]! * dt;
+        if (confPos[i * 3 + 1]! > 0.2) alive = true;
+      }
+      confGeo.attributes.position!.needsUpdate = true;
+      if (!alive || celebrating <= 0) confetti.visible = false;
+    }
+
+    // ---- Cinemática de gol ----
+    if (celebrating > 0) {
+      celebrating -= dt;
+      celebrate(hero, t);
+      animateLimbs(mate, 0, dt);
+      const closeCam = new THREE.Vector3(
+        hero.root.position.x + Math.sin(t * 0.5) * 3,
+        3.4,
+        hero.root.position.z + 6,
+      );
+      camera.position.lerp(closeCam, Math.min(1, dt * 4));
+      camLook.lerp(new THREE.Vector3(hero.root.position.x, 1.6, hero.root.position.z), Math.min(1, dt * 5));
+      camera.lookAt(camLook);
+      marker.position.set(hero.root.position.x, 0.06, hero.root.position.z);
+      renderer.render(scene, camera);
+      if (celebrating <= 0) {
+        resetPose(hero);
+        hero.root.rotation.y = 0;
+        resetKickoff();
+      }
+      return;
+    }
 
     // reloj: ~1s real = 3 minutos de partido
     if (!finished) {
@@ -309,12 +504,50 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     if (keys.has("arrowleft") || keys.has("a")) dir.x -= 1;
     if (keys.has("arrowright") || keys.has("d")) dir.x += 1;
     if (dir.lengthSq() > 0) dir.normalize();
-    hero.vel.lerp(dir.multiplyScalar(9), Math.min(1, dt * 8));
+
+    const turbo = keys.has("f");
+    const baseSpeed = turbo ? 13.5 : 9;
+
+    // AMAGUE (Q): desplazamiento lateral rápido
+    if (wantDodge) {
+      wantDodge = false;
+      const base = hero.vel.lengthSq() > 0.5 ? hero.vel.clone().normalize() : new THREE.Vector3(1, 0, 0);
+      dodgeDir.set(-base.z, 0, base.x).multiplyScalar(Math.random() > 0.5 ? 1 : -1);
+      dodgeTimer = 0.28;
+    }
+    if (dodgeTimer > 0) {
+      dodgeTimer -= dt;
+      hero.root.position.addScaledVector(dodgeDir, 20 * dt);
+      hero.root.rotation.y += dt * 18;
+    }
+
+    hero.vel.lerp(dir.multiplyScalar(baseSpeed), Math.min(1, dt * 8));
     hero.root.position.addScaledVector(hero.vel, dt);
     clamp(hero.root.position);
-    faceMove(hero, dt);
+    if (dodgeTimer <= 0) faceMove(hero, dt);
     animateLimbs(hero, hero.vel.length() / 9, dt);
     marker.position.set(hero.root.position.x, 0.06, hero.root.position.z);
+
+    // estela de turbo
+    trailTimer -= dt;
+    if (turbo && hero.vel.lengthSq() > 4 && trailTimer <= 0) {
+      trailTimer = 0.05;
+      const m = trail[trailIdx]!;
+      m.position.set(hero.root.position.x, 0.9, hero.root.position.z);
+      m.visible = true;
+      trailLife[trailIdx] = 0.45;
+      trailIdx = (trailIdx + 1) % TRAIL;
+    }
+    for (let i = 0; i < TRAIL; i++) {
+      if (trailLife[i]! > 0) {
+        trailLife[i] = Math.max(0, trailLife[i]! - dt);
+        const m = trail[i]!;
+        const l = trailLife[i]!;
+        (m.material as THREE.MeshBasicMaterial).opacity = l * 1.3;
+        m.scale.setScalar(0.4 + l);
+        if (l === 0) m.visible = false;
+      }
+    }
 
     // ---- IA ----
     const chase = (p: Player, speed: number, goalX: number) => {
@@ -336,10 +569,31 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     chase(rival2, 3.6, -FIELD_X);
     chase(mate, 3.4, FIELD_X);
 
-    // ---- colisión héroe/pelota ----
-    const hb = new THREE.Vector3().subVectors(ball.position, hero.root.position);
+    // ---- acciones sobre la pelota ----
+    const hb = new THREE.Vector3().subSubVectorsSafe?.length
+      ? new THREE.Vector3()
+      : new THREE.Vector3().subVectors(ball.position, hero.root.position);
     hb.y = 0;
-    if (hb.length() < ballR + 0.75) {
+    const ballDist = hb.length();
+    const nearBall = ballDist < 2.6;
+
+    if (wantShoot) {
+      wantShoot = false;
+      if (nearBall) {
+        const aim = new THREE.Vector3(FIELD_X - ball.position.x, 0, -ball.position.z * 0.5);
+        kick(hero.root.position, aim, 26);
+      }
+    }
+    if (wantPass) {
+      wantPass = false;
+      if (nearBall) {
+        const aim = new THREE.Vector3().subVectors(mate.root.position, ball.position);
+        kick(hero.root.position, aim, 14);
+      }
+    }
+
+    // conducción simple
+    if (ballDist < ballR + 0.75 && ballVel.length() < 20) {
       const heroSpeed = hero.vel.length();
       const kickDir = heroSpeed > 0.4 ? hero.vel.clone() : hb;
       kick(hero.root.position, kickDir, Math.max(6, heroSpeed * 2.2));
@@ -357,10 +611,11 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       ball.position.z = Math.sign(ball.position.z) * FIELD_Z;
       ballVel.z *= -0.6;
     }
+    // trigger de gol
     if (Math.abs(ball.position.x) > FIELD_X) {
       if (Math.abs(ball.position.z) < GOAL_HALF) {
-        if (!finished) opts.onScore(ball.position.x > 0 ? "team" : "rival");
-        resetKickoff();
+        scoreGoal(ball.position.x > 0 ? "team" : "rival");
+        if (celebrating <= 0) resetKickoff();
       } else {
         ball.position.x = Math.sign(ball.position.x) * FIELD_X;
         ballVel.x *= -0.6;
@@ -374,11 +629,15 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       hero.root.position.z * 0.6 + 21,
     );
     camera.position.lerp(camTarget, Math.min(1, dt * 2.5));
-    camera.lookAt(hero.root.position.x * 0.5, 1, hero.root.position.z * 0.5);
+    camLook.lerp(
+      new THREE.Vector3(hero.root.position.x * 0.5, 1, hero.root.position.z * 0.5),
+      Math.min(1, dt * 4),
+    );
+    camera.lookAt(camLook);
 
     clouds.children.forEach((c, i) => {
       c.position.x += dt * (1 + (i % 3) * 0.4);
-      if (c.position.x > 34) c.position.x = -34;
+      if (c.position.x > 40) c.position.x = -40;
     });
 
     renderer.render(scene, camera);
