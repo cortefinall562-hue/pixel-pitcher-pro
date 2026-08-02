@@ -78,9 +78,27 @@ export default function MatchScreen({
         <LogOut size={16} /> RETIRARSE / TERMINAR
       </button>
 
-      <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-xl bg-pitch-night/75 px-5 py-2 text-xs tracking-widest text-foreground backdrop-blur">
-        MUEVE CON WASD O FLECHAS · TOCA LA PELOTA PARA CONDUCIR Y PATEAR
+      <div className="pointer-events-none absolute bottom-5 left-1/2 flex max-w-[92vw] flex-wrap justify-center gap-x-4 gap-y-1 -translate-x-1/2 rounded-xl bg-pitch-night/75 px-5 py-2 text-[11px] tracking-widest text-foreground backdrop-blur">
+        <span>WASD / FLECHAS: MOVER</span>
+        <span className="text-turf">E: TIRO</span>
+        <span className="text-turf">F: TURBO</span>
+        <span className="text-turf">Q: AMAGUE</span>
+        <span className="text-turf">ESPACIO: PASE</span>
       </div>
+
+      {goalSide && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center">
+          <div className="animate-scale-in text-center">
+            <p className="font-display text-6xl text-turf drop-shadow-[0_8px_0_rgba(0,0,0,0.45)] sm:text-8xl">
+              ¡GOOOL!
+            </p>
+            <p className="mt-2 font-display text-lg tracking-[0.35em] text-foreground">
+              {goalSide === "team" ? club.name.toUpperCase() : rival.name.toUpperCase()}
+            </p>
+          </div>
+        </div>
+      )}
+
 
       {over && (
         <div className="absolute inset-0 grid animate-fade-in place-items-center bg-black/70 p-6">
