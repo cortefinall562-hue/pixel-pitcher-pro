@@ -22,6 +22,7 @@ export default function MatchScreen({
   const [score, setScore] = useState({ team: 0, rival: 0 });
   const [minute, setMinute] = useState(0);
   const [over, setOver] = useState(false);
+  const [goalSide, setGoalSide] = useState<"team" | "rival" | null>(null);
   const scoreRef = useRef(score);
   scoreRef.current = score;
 
@@ -34,11 +35,19 @@ export default function MatchScreen({
       rivalShorts: rival.shorts,
       onScore: (side) =>
         setScore((s) => ({ ...s, [side]: s[side] + 1 })),
+      onGoal: (side) => setGoalSide(side),
       onClock: setMinute,
       onEnd: () => setOver(true),
     });
     return () => api.dispose();
   }, [club, rival]);
+
+  useEffect(() => {
+    if (!goalSide) return;
+    const t = setTimeout(() => setGoalSide(null), 3000);
+    return () => clearTimeout(t);
+  }, [goalSide]);
+
 
   const exit = useCallback(() => {
     onExit({ ...scoreRef.current, rivalName: rival.name });
