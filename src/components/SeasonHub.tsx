@@ -1,7 +1,11 @@
-import { useState } from "react";
-import { Globe, Heart, Mail, X, Zap } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
+import { Globe, Heart, Mail, X, Zap, Handshake } from "lucide-react";
 import { CLUBS, formatBudget, type Club } from "@/game/clubs";
+import type { Mail as MailData } from "@/game/career";
 import type { MatchResult } from "@/components/MatchScreen";
+
+const InboxModal = lazy(() => import("@/components/InboxModal"));
+
 
 const EXTRA_CRESTS: Record<string, [string, string]> = {
   "Sevilla FC": ["#d8262f", "#f4f4f4"],
