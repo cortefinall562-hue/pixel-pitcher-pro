@@ -227,15 +227,33 @@ export default function SeasonHub({
             </div>
             <div>
               <p className="field-label">Presupuesto</p>
-              <p className="text-sm font-semibold text-turf">{formatBudget(club.budget)}</p>
+              <p className="text-sm font-semibold text-turf">{formatBudget(budget)}</p>
+            </div>
+            <div>
+              <p className="field-label">Plantilla</p>
+              <p className="text-sm font-semibold text-foreground">{squadSize} jugadores</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowOnline(true)}
-            className="ml-auto flex items-center gap-2 rounded-xl border border-turf/40 bg-turf/15 px-4 py-2 font-display text-xs tracking-widest text-turf transition-shadow hover:shadow-[0_0_24px_color-mix(in_oklab,var(--color-turf)_55%,transparent)]"
-          >
-            <Globe size={16} /> MODO ONLINE
-          </button>
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={() => setShowInbox(true)}
+              className="relative flex items-center gap-2 rounded-xl border border-border bg-secondary/60 px-4 py-2 font-display text-xs tracking-widest text-foreground transition-colors hover:border-turf/60"
+            >
+              📧 BANDEJA
+              {unread > 0 && (
+                <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-foreground">
+                  {unread}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowOnline(true)}
+              className="flex items-center gap-2 rounded-xl border border-turf/40 bg-turf/15 px-4 py-2 font-display text-xs tracking-widest text-turf transition-shadow hover:shadow-[0_0_24px_color-mix(in_oklab,var(--color-turf)_55%,transparent)]"
+            >
+              <Globe size={16} /> MODO ONLINE
+            </button>
+          </div>
+
         </div>
       </header>
 
