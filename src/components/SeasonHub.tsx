@@ -1,7 +1,11 @@
-import { useState } from "react";
-import { Globe, Heart, Mail, X, Zap } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
+import { Globe, Heart, Mail, X, Zap, Handshake } from "lucide-react";
 import { CLUBS, formatBudget, type Club } from "@/game/clubs";
+import type { Mail as MailData } from "@/game/career";
 import type { MatchResult } from "@/components/MatchScreen";
+
+const InboxModal = lazy(() => import("@/components/InboxModal"));
+
 
 const EXTRA_CRESTS: Record<string, [string, string]> = {
   "Sevilla FC": ["#d8262f", "#f4f4f4"],
@@ -60,20 +64,6 @@ function buildFixtures(club: Club) {
   }));
 }
 
-const EMAILS = [
-  {
-    subject: "¡Bienvenido Mánager!",
-    sender: "Presidente del Club",
-    preview: "El vestuario te espera. Confiamos en tu proyecto para esta temporada...",
-    unread: true,
-  },
-  {
-    subject: "Informe médico de la plantilla",
-    sender: "Preparador Físico",
-    preview: "Dos jugadores arrastran molestias musculares. Detalle adjunto...",
-    unread: false,
-  },
-];
 
 interface NewsItem {
   outlet: string;
@@ -167,17 +157,34 @@ function NewsCard({ item }: { item: NewsItem }) {
 export default function SeasonHub({
   managerName,
   club,
+  budget,
+  mails,
+  squadSize,
   lastResult,
   onPlayMatch,
+  onOpenMail,
+  onAcceptMail,
+  onRejectMail,
+  onNegotiateMail,
 }: {
   managerName: string;
   club: Club;
+  budget: number;
+  mails: MailData[];
+  squadSize: number;
   lastResult: MatchResult | null;
   onPlayMatch: (rivalName: string) => void;
+  onOpenMail: (id: string) => void;
+  onAcceptMail: (mail: MailData) => void;
+  onRejectMail: (mail: MailData) => void;
+  onNegotiateMail: (mail: MailData) => void;
 }) {
   const [showOnline, setShowOnline] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
+  const unread = mails.filter((m) => !m.read).length;
   const fixtures = buildFixtures(club);
   const next = fixtures[0]!;
+
 
   const resultNews: NewsItem[] = lastResult
     ? [
@@ -220,15 +227,33 @@ export default function SeasonHub({
             </div>
             <div>
               <p className="field-label">Presupuesto</p>
-              <p className="text-sm font-semibold text-turf">{formatBudget(club.budget)}</p>
+              <p className="text-sm font-semibold text-turf">{formatBudget(budget)}</p>
+            </div>
+            <div>
+              <p className="field-label">Plantilla</p>
+              <p className="text-sm font-semibold text-foreground">{squadSize} jugadores</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowOnline(true)}
-            className="ml-auto flex items-center gap-2 rounded-xl border border-turf/40 bg-turf/15 px-4 py-2 font-display text-xs tracking-widest text-turf transition-shadow hover:shadow-[0_0_24px_color-mix(in_oklab,var(--color-turf)_55%,transparent)]"
-          >
-            <Globe size={16} /> MODO ONLINE
-          </button>
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={() => setShowInbox(true)}
+              className="relative flex items-center gap-2 rounded-xl border border-border bg-secondary/60 px-4 py-2 font-display text-xs tracking-widest text-foreground transition-colors hover:border-turf/60"
+            >
+              📧 BANDEJA
+              {unread > 0 && (
+                <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-foreground">
+                  {unread}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowOnline(true)}
+              className="flex items-center gap-2 rounded-xl border border-turf/40 bg-turf/15 px-4 py-2 font-display text-xs tracking-widest text-turf transition-shadow hover:shadow-[0_0_24px_color-mix(in_oklab,var(--color-turf)_55%,transparent)]"
+            >
+              <Globe size={16} /> MODO ONLINE
+            </button>
+          </div>
+
         </div>
       </header>
 
@@ -294,28 +319,44 @@ export default function SeasonHub({
             <div className="flex items-center gap-2">
               <p className="field-label">Bandeja de Entrada</p>
               <Mail size={14} className="text-turf" />
+              <button
+                onClick={() => setShowInbox(true)}
+                className="ml-auto text-xs tracking-widest text-turf hover:underline"
+              >
+                VER TODO ({mails.length})
+              </button>
             </div>
             <ul className="mt-4 space-y-3">
-              {EMAILS.map((e) => (
-                <li key={e.subject}>
-                  <button className="flex w-full items-start gap-4 rounded-xl border border-border bg-secondary/40 p-4 text-left transition-colors hover:bg-secondary hover:border-turf/50">
+              {mails.slice(0, 3).map((e) => (
+                <li key={e.id}>
+                  <button
+                    onClick={() => setShowInbox(true)}
+                    className="flex w-full items-start gap-4 rounded-xl border border-border bg-secondary/40 p-4 text-left transition-colors hover:bg-secondary hover:border-turf/50"
+                  >
                     <span
                       className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${
-                        e.unread ? "bg-turf" : "bg-muted-foreground/40"
+                        !e.read ? "bg-turf" : "bg-muted-foreground/40"
                       }`}
                     />
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block text-sm font-bold text-foreground">{e.subject}</span>
                       <span className="block text-xs text-turf">{e.sender}</span>
                       <span className="mt-1 block truncate text-xs text-muted-foreground">
-                        {e.preview}
+                        {e.body}
                       </span>
                     </span>
+                    {e.offer && !e.resolved && (
+                      <Handshake size={16} className="mt-1 flex-none text-turf" />
+                    )}
                   </button>
                 </li>
               ))}
+              {mails.length === 0 && (
+                <li className="text-xs text-muted-foreground">Sin mensajes por ahora.</li>
+              )}
             </ul>
           </section>
+
         </div>
 
         {/* DERECHA: FEED 9:16 */}
@@ -350,6 +391,24 @@ export default function SeasonHub({
           </div>
         </div>
       )}
+
+      {/* MODAL BANDEJA DE ENTRADA */}
+      {showInbox && (
+        <Suspense fallback={null}>
+          <InboxModal
+            mails={mails}
+            onClose={() => setShowInbox(false)}
+            onOpenMail={onOpenMail}
+            onAccept={onAcceptMail}
+            onReject={onRejectMail}
+            onNegotiate={(m) => {
+              setShowInbox(false);
+              onNegotiateMail(m);
+            }}
+          />
+        </Suspense>
+      )}
+
     </div>
   );
 }

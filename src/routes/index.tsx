@@ -1,14 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ClientOnly } from "@tanstack/react-router";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { BrowStyle, CoachConfig, HairColor, HairStyle, Outfit } from "@/game/coachScene";
 import { CLUBS, DEFAULT_CLUB_ID, clubsByLeague, formatBudget, getClub } from "@/game/clubs";
 import type { MatchResult } from "@/components/MatchScreen";
+import type { NegotiationOutcome } from "@/components/NegotiationScreen";
+import {
+  buildSquad,
+  formatCoins,
+  initialCareer,
+  loadCareer,
+  makeJobOfferMail,
+  makeSellOfferMail,
+  playerValue,
+  saveCareer,
+  type CareerState,
+  type Mail,
+  type OfferData,
+} from "@/game/career";
 
 const CoachCanvas = lazy(() => import("@/components/CoachCanvas"));
 const SeasonHub = lazy(() => import("@/components/SeasonHub"));
 const MatchScreen = lazy(() => import("@/components/MatchScreen"));
-
+const NegotiationScreen = lazy(() => import("@/components/NegotiationScreen"));
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,7 +43,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Screen = "menu" | "settings" | "editor" | "season" | "match";
+type Screen = "menu" | "settings" | "editor" | "season" | "match" | "negotiation";
 
 const HAIR_LABELS = ["Pelado", "Pelo corto de bloques", "Flequillo de bloques"];
 const BROW_LABELS = ["Normales", "Enojadas", "Gruesas"];
@@ -50,8 +64,11 @@ function Index() {
   const [clubId, setClubId] = useState<string>(DEFAULT_CLUB_ID);
   const [rivalName, setRivalName] = useState<string>("");
   const [lastResult, setLastResult] = useState<MatchResult | null>(null);
+  const [career, setCareer] = useState<CareerState | null>(null);
+  const [pendingOffer, setPendingOffer] = useState<{ mailId: string; offer: OfferData } | null>(null);
 
-  const club = getClub(clubId);
+  const editorClub = getClub(clubId);
+  const club = getClub(career?.clubId ?? clubId);
   const rival = useMemo(
     () => CLUBS.find((c) => c.name === rivalName) ?? CLUBS.find((c) => c.id !== club.id)!,
     [rivalName, club.id],
@@ -62,46 +79,239 @@ function Index() {
     [hairStyle, hairColor, brows, outfit],
   );
 
-  const cycle = <T extends number>(v: T, dir: number): T =>
-    (((v + dir + 3) % 3) as T);
+  const cycle = <T extends number>(v: T, dir: number): T => (((v + dir + 3) % 3) as T);
 
   const managerName = name.trim() || "Mánager Gallardo";
 
-  if (screen === "match") {
+  // ---- Persistencia en localStorage ----
+  useEffect(() => {
+    if (career) saveCareer(career);
+  }, [career]);
+
+  const startCareer = () => {
+    const stored = loadCareer();
+    setCareer(
+      stored && stored.clubId === clubId
+        ? { ...stored, managerName }
+        : initialCareer(managerName, clubId),
+    );
+    setScreen("season");
+  };
+
+  const patch = useCallback((fn: (c: CareerState) => CareerState) => {
+    setCareer((prev) => (prev ? fn(prev) : prev));
+  }, []);
+
+  const resolveMail = (id: string, resolved: "accepted" | "rejected") =>
+    patch((c) => ({
+      ...c,
+      mails: c.mails.map((m) => (m.id === id ? { ...m, resolved, read: true } : m)),
+    }));
+
+  const pushMail = (mail: Mail) => patch((c) => ({ ...c, mails: [mail, ...c.mails] }));
+
+  const applyTransfer = (offer: OfferData, amount: number, mailId: string | null) => {
+    patch((c) => {
+      if (offer.side === "sell") {
+        return {
+          ...c,
+          budget: c.budget + amount,
+          squad: c.squad.filter((p) => p.id !== offer.playerId),
+          mails: c.mails.map((m) =>
+            m.id === mailId ? { ...m, resolved: "accepted" as const, read: true } : m,
+          ),
+        };
+      }
+      if (c.budget < amount) return c;
+      return {
+        ...c,
+        budget: c.budget - amount,
+        squad: [
+          ...c.squad,
+          {
+            id: `${offer.playerId}-in`,
+            name: offer.playerName,
+            pos: offer.pos,
+            ovr: offer.ovr,
+            value: playerValue(offer.ovr, getClub(c.clubId).budget),
+            starter: false,
+          },
+        ],
+        mails: c.mails.map((m) =>
+          m.id === mailId ? { ...m, resolved: "accepted" as const, read: true } : m,
+        ),
+      };
+    });
+  };
+
+  const handleAccept = (mail: Mail) => {
+    if (mail.offer) {
+      if (mail.offer.side === "buy" && (career?.budget ?? 0) < mail.offer.amount) {
+        pushMail({
+          id: `${mail.id}-nofunds`,
+          kind: "report",
+          sender: "Departamento Financiero",
+          subject: "Presupuesto insuficiente",
+          body: `No podemos cubrir ${formatCoins(mail.offer.amount)} por ${mail.offer.playerName}. Saldo actual: ${formatCoins(career?.budget ?? 0)}.`,
+          time: "Ahora",
+          read: false,
+          archived: false,
+        });
+
+        return;
+      }
+      applyTransfer(mail.offer, mail.offer.amount, mail.id);
+      pushMail({
+        id: `${mail.id}-done`,
+        kind: "report",
+        sender: "Secretaría Técnica",
+        subject:
+          mail.offer.side === "sell"
+            ? `Venta cerrada: ${mail.offer.playerName}`
+            : `Fichaje cerrado: ${mail.offer.playerName}`,
+        body: `Operación registrada por ${formatCoins(mail.offer.amount)}. Plantilla y saldo actualizados.`,
+        time: "Ahora",
+        read: false,
+        archived: false,
+      });
+      return;
+    }
+    if (mail.jobClubId) {
+      const next = getClub(mail.jobClubId);
+      patch((c) => ({
+        ...c,
+        clubId: next.id,
+        budget: next.budget,
+        squad: buildSquad(next),
+        mails: c.mails.map((m) =>
+          m.id === mail.id ? { ...m, resolved: "accepted" as const, read: true } : m,
+        ),
+      }));
+      setLastResult(null);
+      pushMail({
+        id: `${mail.id}-welcome`,
+        kind: "report",
+        sender: `Presidencia · ${next.name}`,
+        subject: `Bienvenido al banquillo de ${next.name}`,
+        body: `Ya dirigís a ${next.name} (${next.league}). Presupuesto disponible: ${formatCoins(next.budget)}.`,
+        time: "Ahora",
+        read: false,
+        archived: false,
+      });
+      return;
+    }
+    resolveMail(mail.id, "accepted");
+  };
+
+  const handleNegotiate = (mail: Mail) => {
+    if (!mail.offer) return;
+    setPendingOffer({ mailId: mail.id, offer: mail.offer });
+    setScreen("negotiation");
+  };
+
+  const finishNegotiation = (outcome: NegotiationOutcome | null) => {
+    if (outcome?.accepted && pendingOffer) {
+      applyTransfer(outcome.offer, outcome.amount, pendingOffer.mailId);
+      pushMail({
+        id: `${pendingOffer.mailId}-neg`,
+        kind: "report",
+        sender: "Secretaría Técnica",
+        subject: `Contrato firmado: ${outcome.offer.playerName}`,
+        body: `Acuerdo alcanzado por ${formatCoins(outcome.amount)}${outcome.clause ? " con cláusula de rescisión incluida" : ""}.`,
+        time: "Ahora",
+        read: false,
+        archived: false,
+      });
+    }
+    setPendingOffer(null);
+    setScreen("season");
+  };
+
+  const handleMatchExit = (result: MatchResult) => {
+    setLastResult(result);
+    const won = result.team > result.rival;
+    patch((c) => {
+      const current = getClub(c.clubId);
+      const prize = won ? 1_500_000 : result.team === result.rival ? 600_000 : 200_000;
+      const extra: Mail[] = [makeSellOfferMail(current, c.squad, c.mails.length)];
+      if (won && (c.wins + 1) % 2 === 0) extra.push(makeJobOfferMail(current));
+      return {
+        ...c,
+        wins: c.wins + (won ? 1 : 0),
+        budget: c.budget + prize,
+        mails: [
+          {
+            id: `res-${Date.now()}`,
+            kind: "report",
+            sender: "Departamento Financiero",
+            subject: `Premio por ${won ? "victoria" : result.team === result.rival ? "empate" : "derrota"}: ${formatCoins(prize)}`,
+            body: `Resultado ${current.name} ${result.team} - ${result.rival} ${result.rivalName}. Saldo acreditado: ${formatCoins(prize)}.`,
+            time: "Ahora",
+            read: false,
+            archived: false,
+          },
+          ...extra,
+          ...c.mails,
+        ],
+      };
+    });
+    setScreen("season");
+  };
+
+  if (screen === "negotiation" && pendingOffer && career) {
     return (
-      <ClientOnly fallback={<div className="min-h-screen bg-sky" />}>
-        <Suspense fallback={<div className="min-h-screen bg-sky" />}>
-          <MatchScreen
+      <ClientOnly fallback={<div className="min-h-screen bg-pitch-night" />}>
+        <Suspense fallback={<div className="min-h-screen bg-pitch-night" />}>
+          <NegotiationScreen
             club={club}
-            rival={rival}
-            onExit={(result) => {
-              setLastResult(result);
-              setScreen("season");
-            }}
+            budget={career.budget}
+            offer={pendingOffer.offer}
+            onFinish={finishNegotiation}
           />
         </Suspense>
       </ClientOnly>
     );
   }
 
-  if (screen === "season") {
+  if (screen === "match") {
+    return (
+      <ClientOnly fallback={<div className="min-h-screen bg-sky" />}>
+        <Suspense fallback={<div className="min-h-screen bg-sky" />}>
+          <MatchScreen club={club} rival={rival} onExit={handleMatchExit} />
+        </Suspense>
+      </ClientOnly>
+    );
+  }
+
+  if (screen === "season" && career) {
     return (
       <Suspense fallback={<div className="min-h-screen bg-pitch-night" />}>
         <div className="animate-fade-in">
           <SeasonHub
-            managerName={managerName}
+            managerName={career.managerName}
             club={club}
+            budget={career.budget}
+            mails={career.mails}
+            squadSize={career.squad.length}
             lastResult={lastResult}
             onPlayMatch={(r) => {
               setRivalName(r);
               setScreen("match");
             }}
+            onOpenMail={(id) =>
+              patch((c) => ({
+                ...c,
+                mails: c.mails.map((m) => (m.id === id ? { ...m, read: true } : m)),
+              }))
+            }
+            onAcceptMail={handleAccept}
+            onRejectMail={(m) => resolveMail(m.id, "rejected")}
+            onNegotiateMail={handleNegotiate}
           />
         </div>
       </Suspense>
     );
   }
-
 
   return (
     <main className="flex min-h-screen flex-col bg-pitch-night lg:h-screen lg:flex-row lg:overflow-hidden">
@@ -254,14 +464,12 @@ function Index() {
                 ))}
               </select>
               <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">{club.league}</span>
-                <span className="font-display text-turf">{formatBudget(club.budget)}</span>
+                <span className="text-muted-foreground">{editorClub.league}</span>
+                <span className="font-display text-turf">{formatBudget(editorClub.budget)}</span>
               </div>
-
             </div>
 
-
-            <button className="btn-play w-full" onClick={() => setScreen("season")}>
+            <button className="btn-play w-full" onClick={startCareer}>
               GUARDAR Y CONTINUAR
             </button>
           </div>
