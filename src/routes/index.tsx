@@ -148,7 +148,6 @@ function Index() {
     if (mail.offer) {
       if (mail.offer.side === "buy" && (career?.budget ?? 0) < mail.offer.amount) {
         pushMail({
-          ...mail,
           id: `${mail.id}-nofunds`,
           kind: "report",
           sender: "Departamento Financiero",
@@ -156,9 +155,9 @@ function Index() {
           body: `No podemos cubrir ${formatCoins(mail.offer.amount)} por ${mail.offer.playerName}. Saldo actual: ${formatCoins(career?.budget ?? 0)}.`,
           time: "Ahora",
           read: false,
-          resolved: undefined,
-          offer: undefined,
+          archived: false,
         });
+
         return;
       }
       applyTransfer(mail.offer, mail.offer.amount, mail.id);
