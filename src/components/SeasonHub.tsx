@@ -391,6 +391,24 @@ export default function SeasonHub({
           </div>
         </div>
       )}
+
+      {/* MODAL BANDEJA DE ENTRADA */}
+      {showInbox && (
+        <Suspense fallback={null}>
+          <InboxModal
+            mails={mails}
+            onClose={() => setShowInbox(false)}
+            onOpenMail={onOpenMail}
+            onAccept={onAcceptMail}
+            onReject={onRejectMail}
+            onNegotiate={(m) => {
+              setShowInbox(false);
+              onNegotiateMail(m);
+            }}
+          />
+        </Suspense>
+      )}
+
     </div>
   );
 }
