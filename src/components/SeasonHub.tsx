@@ -167,17 +167,34 @@ function NewsCard({ item }: { item: NewsItem }) {
 export default function SeasonHub({
   managerName,
   club,
+  budget,
+  mails,
+  squadSize,
   lastResult,
   onPlayMatch,
+  onOpenMail,
+  onAcceptMail,
+  onRejectMail,
+  onNegotiateMail,
 }: {
   managerName: string;
   club: Club;
+  budget: number;
+  mails: MailData[];
+  squadSize: number;
   lastResult: MatchResult | null;
   onPlayMatch: (rivalName: string) => void;
+  onOpenMail: (id: string) => void;
+  onAcceptMail: (mail: MailData) => void;
+  onRejectMail: (mail: MailData) => void;
+  onNegotiateMail: (mail: MailData) => void;
 }) {
   const [showOnline, setShowOnline] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
+  const unread = mails.filter((m) => !m.read).length;
   const fixtures = buildFixtures(club);
   const next = fixtures[0]!;
+
 
   const resultNews: NewsItem[] = lastResult
     ? [
