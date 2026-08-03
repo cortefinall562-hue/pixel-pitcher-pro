@@ -319,28 +319,44 @@ export default function SeasonHub({
             <div className="flex items-center gap-2">
               <p className="field-label">Bandeja de Entrada</p>
               <Mail size={14} className="text-turf" />
+              <button
+                onClick={() => setShowInbox(true)}
+                className="ml-auto text-xs tracking-widest text-turf hover:underline"
+              >
+                VER TODO ({mails.length})
+              </button>
             </div>
             <ul className="mt-4 space-y-3">
-              {EMAILS.map((e) => (
-                <li key={e.subject}>
-                  <button className="flex w-full items-start gap-4 rounded-xl border border-border bg-secondary/40 p-4 text-left transition-colors hover:bg-secondary hover:border-turf/50">
+              {mails.slice(0, 3).map((e) => (
+                <li key={e.id}>
+                  <button
+                    onClick={() => setShowInbox(true)}
+                    className="flex w-full items-start gap-4 rounded-xl border border-border bg-secondary/40 p-4 text-left transition-colors hover:bg-secondary hover:border-turf/50"
+                  >
                     <span
                       className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${
-                        e.unread ? "bg-turf" : "bg-muted-foreground/40"
+                        !e.read ? "bg-turf" : "bg-muted-foreground/40"
                       }`}
                     />
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block text-sm font-bold text-foreground">{e.subject}</span>
                       <span className="block text-xs text-turf">{e.sender}</span>
                       <span className="mt-1 block truncate text-xs text-muted-foreground">
-                        {e.preview}
+                        {e.body}
                       </span>
                     </span>
+                    {e.offer && !e.resolved && (
+                      <Handshake size={16} className="mt-1 flex-none text-turf" />
+                    )}
                   </button>
                 </li>
               ))}
+              {mails.length === 0 && (
+                <li className="text-xs text-muted-foreground">Sin mensajes por ahora.</li>
+              )}
             </ul>
           </section>
+
         </div>
 
         {/* DERECHA: FEED 9:16 */}
