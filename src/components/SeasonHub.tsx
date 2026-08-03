@@ -64,20 +64,6 @@ function buildFixtures(club: Club) {
   }));
 }
 
-const EMAILS = [
-  {
-    subject: "¡Bienvenido Mánager!",
-    sender: "Presidente del Club",
-    preview: "El vestuario te espera. Confiamos en tu proyecto para esta temporada...",
-    unread: true,
-  },
-  {
-    subject: "Informe médico de la plantilla",
-    sender: "Preparador Físico",
-    preview: "Dos jugadores arrastran molestias musculares. Detalle adjunto...",
-    unread: false,
-  },
-];
 
 interface NewsItem {
   outlet: string;
