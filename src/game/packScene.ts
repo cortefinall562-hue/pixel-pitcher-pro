@@ -318,7 +318,7 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(4.4, 2.75),
       new THREE.MeshBasicMaterial({
-        map: holoTextures[i],
+        map: holoTextures[i]!,
         transparent: true,
         opacity: 0,
         side: THREE.DoubleSide,
@@ -557,28 +557,31 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
     for (let i = 0; i < smoke.count; i++) {
       if (smokeLife[i]! <= 0) continue;
       smokeLife[i]! -= dt;
-      smoke.pos[i * 3] += smoke.vel[i]!.x * dt;
-      smoke.pos[i * 3 + 1] += smoke.vel[i]!.y * dt;
-      smoke.pos[i * 3 + 2] += smoke.vel[i]!.z * dt;
+      const sv = smoke.vel[i]!;
+      smoke.pos[i * 3] = (smoke.pos[i * 3] ?? 0) + sv.x * dt;
+      smoke.pos[i * 3 + 1] = (smoke.pos[i * 3 + 1] ?? 0) + sv.y * dt;
+      smoke.pos[i * 3 + 2] = (smoke.pos[i * 3 + 2] ?? 0) + sv.z * dt;
     }
-    smoke.points.geometry.attributes.position!.needsUpdate = true;
+    smoke.points.geometry.attributes["position"]!.needsUpdate = true;
     for (let i = 0; i < fire.count; i++) {
       if (fireLife[i]! <= 0) continue;
       fireLife[i]! -= dt;
       fire.vel[i]!.y -= 6 * dt;
-      fire.pos[i * 3] += fire.vel[i]!.x * dt;
-      fire.pos[i * 3 + 1] += fire.vel[i]!.y * dt;
-      fire.pos[i * 3 + 2] += fire.vel[i]!.z * dt;
+      const fv = fire.vel[i]!;
+      fire.pos[i * 3] = (fire.pos[i * 3] ?? 0) + fv.x * dt;
+      fire.pos[i * 3 + 1] = (fire.pos[i * 3 + 1] ?? 0) + fv.y * dt;
+      fire.pos[i * 3 + 2] = (fire.pos[i * 3 + 2] ?? 0) + fv.z * dt;
     }
-    fire.points.geometry.attributes.position!.needsUpdate = true;
+    fire.points.geometry.attributes["position"]!.needsUpdate = true;
     if (confetti.points.visible) {
       for (let i = 0; i < confetti.count; i++) {
-        confetti.pos[i * 3] += confetti.vel[i]!.x * dt;
-        confetti.pos[i * 3 + 1] += confetti.vel[i]!.y * dt;
-        confetti.pos[i * 3 + 2] += confetti.vel[i]!.z * dt;
-        if (confetti.pos[i * 3 + 1] < -1) confetti.pos[i * 3 + 1] = 10 + Math.random() * 8;
+        const cv = confetti.vel[i]!;
+        confetti.pos[i * 3] = (confetti.pos[i * 3] ?? 0) + cv.x * dt;
+        confetti.pos[i * 3 + 1] = (confetti.pos[i * 3 + 1] ?? 0) + cv.y * dt;
+        confetti.pos[i * 3 + 2] = (confetti.pos[i * 3 + 2] ?? 0) + cv.z * dt;
+        if ((confetti.pos[i * 3 + 1] ?? 0) < -1) confetti.pos[i * 3 + 1] = 10 + Math.random() * 8;
       }
-      confetti.points.geometry.attributes.position!.needsUpdate = true;
+      confetti.points.geometry.attributes["position"]!.needsUpdate = true;
     }
 
     renderer.render(scene, camera);
