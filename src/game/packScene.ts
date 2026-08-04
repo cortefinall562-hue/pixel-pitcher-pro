@@ -534,7 +534,7 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
       cardMesh.visible = true;
       halo.visible = true;
       confetti.points.visible = true;
-      camera.position.set(0, 3.6, 13.5);
+      camera.position.set(0, 3.6, 16);
       cardMesh.position.set(0, 14 - 10.6 * Math.min(1, k * 1.25), 3);
       cardMesh.rotation.y = Math.sin(t * 1.6) * 0.35;
       cardMesh.rotation.z = Math.sin(t * 1.1) * 0.05;
