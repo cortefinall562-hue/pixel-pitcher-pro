@@ -443,7 +443,6 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
   let raf = 0;
   const clock = new THREE.Clock();
   const startedAt = performance.now();
-  let lastLogged = -1;
 
   const setPhase = (p: PackPhase) => {
     if (phase !== p) {
@@ -469,10 +468,6 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
     raf = requestAnimationFrame(frame);
     const dt = Math.min(clock.getDelta(), 0.05);
     t = (performance.now() - startedAt) / 1000;
-    if (Math.floor(t) !== lastLogged) {
-      lastLogged = Math.floor(t);
-      console.log("[pack] t", lastLogged, phase);
-    }
 
     // hinchada saltando
     for (let i = 0; i < crowdBase.length; i++) {
@@ -555,7 +550,6 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
       }
       if (k >= 1 && !doneFired) {
         doneFired = true;
-        console.log("[pack] done", t, k);
         opts.onDone();
       }
     }
