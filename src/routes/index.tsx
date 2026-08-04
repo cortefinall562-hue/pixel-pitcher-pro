@@ -18,11 +18,13 @@ import {
   type Mail,
   type OfferData,
 } from "@/game/career";
+import { rollCard, type PackDef, type PlayerCard } from "@/game/packs";
 
 const CoachCanvas = lazy(() => import("@/components/CoachCanvas"));
 const SeasonHub = lazy(() => import("@/components/SeasonHub"));
 const MatchScreen = lazy(() => import("@/components/MatchScreen"));
 const NegotiationScreen = lazy(() => import("@/components/NegotiationScreen"));
+const PackOpeningScreen = lazy(() => import("@/components/PackOpeningScreen"));
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,7 +45,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Screen = "menu" | "settings" | "editor" | "season" | "match" | "negotiation";
+type Screen = "menu" | "settings" | "editor" | "season" | "match" | "negotiation" | "pack";
 
 const HAIR_LABELS = ["Pelado", "Pelo corto de bloques", "Flequillo de bloques"];
 const BROW_LABELS = ["Normales", "Enojadas", "Gruesas"];
@@ -66,6 +68,7 @@ function Index() {
   const [lastResult, setLastResult] = useState<MatchResult | null>(null);
   const [career, setCareer] = useState<CareerState | null>(null);
   const [pendingOffer, setPendingOffer] = useState<{ mailId: string; offer: OfferData } | null>(null);
+  const [pendingPack, setPendingPack] = useState<{ pack: PackDef; card: PlayerCard } | null>(null);
 
   const editorClub = getClub(clubId);
   const club = getClub(career?.clubId ?? clubId);
@@ -227,6 +230,46 @@ function Index() {
     setScreen("season");
   };
 
+  // ---- Tienda de sobres ----
+  const handleBuyPack = (pack: PackDef) => {
+    if ((career?.budget ?? 0) < pack.price) return;
+    patch((c) => ({ ...c, budget: c.budget - pack.price }));
+    setPendingPack({ pack, card: rollCard(pack.tier) });
+    setScreen("pack");
+  };
+
+  const handleClaimCard = (card: PlayerCard) => {
+    patch((c) => ({
+      ...c,
+      squad: [
+        ...c.squad,
+        {
+          id: card.id,
+          name: card.name,
+          pos: card.pos,
+          ovr: card.ovr,
+          value: card.value,
+          starter: false,
+        },
+      ],
+      mails: [
+        {
+          id: `pack-${card.id}`,
+          kind: "report" as const,
+          sender: "Secretaría Técnica",
+          subject: `Nueva carta: ${card.name} (${card.ovr} GRL)`,
+          body: `${card.name} — ${card.pos}, ${card.ovr} GRL, ${card.nationality.name}. Obtenido en ${pendingPack?.pack.name ?? "un sobre"}. Valor estimado: ${formatCoins(card.value)}. Ya está disponible en tu plantilla.`,
+          time: "Ahora",
+          read: false,
+          archived: false,
+        },
+        ...c.mails,
+      ],
+    }));
+    setPendingPack(null);
+    setScreen("season");
+  };
+
   const handleMatchExit = (result: MatchResult) => {
     setLastResult(result);
     const won = result.team > result.rival;
@@ -273,6 +316,21 @@ function Index() {
     );
   }
 
+  if (screen === "pack" && pendingPack && career) {
+    return (
+      <ClientOnly fallback={<div className="min-h-screen bg-black" />}>
+        <Suspense fallback={<div className="min-h-screen bg-black" />}>
+          <PackOpeningScreen
+            tier={pendingPack.pack.tier}
+            card={pendingPack.card}
+            club={club}
+            onClaim={handleClaimCard}
+          />
+        </Suspense>
+      </ClientOnly>
+    );
+  }
+
   if (screen === "match") {
     return (
       <ClientOnly fallback={<div className="min-h-screen bg-sky" />}>
@@ -307,6 +365,7 @@ function Index() {
             onAcceptMail={handleAccept}
             onRejectMail={(m) => resolveMail(m.id, "rejected")}
             onNegotiateMail={handleNegotiate}
+            onBuyPack={handleBuyPack}
           />
         </div>
       </Suspense>
