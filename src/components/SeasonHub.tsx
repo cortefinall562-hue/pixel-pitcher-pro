@@ -1,10 +1,14 @@
 import { lazy, Suspense, useState } from "react";
-import { Globe, Heart, Mail, X, Zap, Handshake } from "lucide-react";
+import { Globe, Heart, Mail, X, Zap, Handshake, ShoppingBag } from "lucide-react";
 import { CLUBS, formatBudget, type Club } from "@/game/clubs";
 import type { Mail as MailData } from "@/game/career";
+import type { PackDef } from "@/game/packs";
 import type { MatchResult } from "@/components/MatchScreen";
 
 const InboxModal = lazy(() => import("@/components/InboxModal"));
+const ShopModal = lazy(() => import("@/components/ShopModal"));
+
+
 
 
 const EXTRA_CRESTS: Record<string, [string, string]> = {
