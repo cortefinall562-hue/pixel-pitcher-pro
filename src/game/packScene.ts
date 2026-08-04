@@ -550,6 +550,7 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
       }
       if (k >= 1 && !doneFired) {
         doneFired = true;
+        console.log("[pack] done", t, k);
         opts.onDone();
       }
     }
