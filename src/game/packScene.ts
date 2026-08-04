@@ -393,7 +393,7 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
   scene.add(halo);
 
   // ---- Partículas: humo, fuegos y confeti ----
-  const smoke = particles(160, 1.5, gold ? [0x9b5cff, 0xffc93c] : [0xdfe7f2, 0xa9c4e0]);
+  const smoke = particles(180, 0.8, gold ? [0x9b5cff, 0xffc93c] : [0xdfe7f2, 0xa9c4e0]);
   const smokeLife: number[] = new Array(smoke.count).fill(0);
   scene.add(smoke.points);
   const fire = particles(220, 0.55, [0xffd76a, 0xff7a3d, 0x3fa9ff]);
@@ -442,6 +442,7 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
   let nextFirework = 0;
   let raf = 0;
   const clock = new THREE.Clock();
+  const startedAt = performance.now();
 
   const setPhase = (p: PackPhase) => {
     if (phase !== p) {
@@ -466,7 +467,7 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
   const frame = () => {
     raf = requestAnimationFrame(frame);
     const dt = Math.min(clock.getDelta(), 0.05);
-    t += dt;
+    t = (performance.now() - startedAt) / 1000;
 
     // hinchada saltando
     for (let i = 0; i < crowdBase.length; i++) {
@@ -520,7 +521,7 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
       }
       lookTarget.copy(star.root.position).add(new THREE.Vector3(0, 1.6, 0));
       camera.lookAt(lookTarget);
-      if (Math.random() < dt * 14) spawnSmoke((Math.random() - 0.5) * 14);
+      if (Math.random() < dt * 8) spawnSmoke((Math.random() - 0.5) * 16);
       if (t > nextFirework) {
         nextFirework = t + 0.35;
         spawnFire((Math.random() - 0.5) * 30, 8 + Math.random() * 6, -12, 8);
