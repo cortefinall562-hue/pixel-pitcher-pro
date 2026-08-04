@@ -313,7 +313,7 @@ export function createPackScene(canvas: HTMLCanvasElement, opts: PackSceneOption
   // ---- Pantallas holográficas ----
   const holoTextures = [flagTexture(card), posTexture(card), crestTexture(card)];
   const holos: THREE.Mesh[] = [];
-  const holoZ = gold ? [-22, -16.5, -11] : [-18, -12];
+  const holoZ = gold ? [-18, -13, -9.5] : [-16, -11];
   holoZ.forEach((z, i) => {
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(4.4, 2.75),
