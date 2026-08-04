@@ -1,10 +1,14 @@
 import { lazy, Suspense, useState } from "react";
-import { Globe, Heart, Mail, X, Zap, Handshake } from "lucide-react";
+import { Globe, Heart, Mail, X, Zap, Handshake, ShoppingBag } from "lucide-react";
 import { CLUBS, formatBudget, type Club } from "@/game/clubs";
 import type { Mail as MailData } from "@/game/career";
+import type { PackDef } from "@/game/packs";
 import type { MatchResult } from "@/components/MatchScreen";
 
 const InboxModal = lazy(() => import("@/components/InboxModal"));
+const ShopModal = lazy(() => import("@/components/ShopModal"));
+
+
 
 
 const EXTRA_CRESTS: Record<string, [string, string]> = {
@@ -166,6 +170,7 @@ export default function SeasonHub({
   onAcceptMail,
   onRejectMail,
   onNegotiateMail,
+  onBuyPack,
 }: {
   managerName: string;
   club: Club;
@@ -178,9 +183,11 @@ export default function SeasonHub({
   onAcceptMail: (mail: MailData) => void;
   onRejectMail: (mail: MailData) => void;
   onNegotiateMail: (mail: MailData) => void;
+  onBuyPack: (pack: PackDef) => void;
 }) {
   const [showOnline, setShowOnline] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
+  const [showShop, setShowShop] = useState(false);
   const unread = mails.filter((m) => !m.read).length;
   const fixtures = buildFixtures(club);
   const next = fixtures[0]!;
@@ -245,6 +252,12 @@ export default function SeasonHub({
                   {unread}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setShowShop(true)}
+              className="flex items-center gap-2 rounded-xl border border-[#f5c53d]/50 bg-[#f5c53d]/15 px-4 py-2 font-display text-xs tracking-widest text-[#f5c53d] transition-shadow hover:shadow-[0_0_24px_rgb(245_197_61/0.45)]"
+            >
+              <ShoppingBag size={16} /> TIENDA
             </button>
             <button
               onClick={() => setShowOnline(true)}
@@ -390,6 +403,20 @@ export default function SeasonHub({
             </button>
           </div>
         </div>
+      )}
+
+      {/* MODAL TIENDA DE SOBRES */}
+      {showShop && (
+        <Suspense fallback={null}>
+          <ShopModal
+            budget={budget}
+            onClose={() => setShowShop(false)}
+            onBuy={(pack) => {
+              setShowShop(false);
+              onBuyPack(pack);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* MODAL BANDEJA DE ENTRADA */}
