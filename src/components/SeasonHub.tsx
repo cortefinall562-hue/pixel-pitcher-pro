@@ -403,23 +403,21 @@ export default function SeasonHub({
         </aside>
       </div>
 
-      {/* MODAL ONLINE */}
+      {/* MODAL ONLINE 1v1 */}
       {showOnline && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-6 animate-fade-in">
-          <div className="panel w-full max-w-md animate-scale-in p-8 text-center">
-            <Globe size={36} className="mx-auto animate-spin text-turf" style={{ animationDuration: "4s" }} />
-            <h2 className="mt-4 font-display text-xl text-foreground">BUSCANDO SERVIDORES...</h2>
-            <p className="mt-3 text-sm text-muted-foreground">
-              Modo Online en desarrollo (Próximamente conexión de salas)
-            </p>
-            <button className="btn-ghost mt-7 w-full" onClick={() => setShowOnline(false)}>
-              <span className="flex items-center justify-center gap-2">
-                <X size={16} /> CERRAR
-              </span>
-            </button>
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <OnlineLobby
+            club={club}
+            online={online}
+            onClose={() => setShowOnline(false)}
+            onStart={(start) => {
+              setShowOnline(false);
+              onStartOnline(start);
+            }}
+          />
+        </Suspense>
       )}
+
 
       {/* MODAL TIENDA DE SOBRES */}
       {showShop && (
