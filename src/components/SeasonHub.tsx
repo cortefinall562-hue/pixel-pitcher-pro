@@ -249,6 +249,13 @@ export default function SeasonHub({
               <p className="field-label">Plantilla</p>
               <p className="text-sm font-semibold text-foreground">{squadSize} jugadores</p>
             </div>
+            <div>
+              <p className="field-label">Puntos liga online</p>
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-[#f5c53d]">
+                <Trophy size={13} /> {online.points} · {divisionFor(online.points)}
+              </p>
+            </div>
+
           </div>
           <div className="ml-auto flex items-center gap-3">
             <button
