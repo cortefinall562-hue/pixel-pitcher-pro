@@ -1,5 +1,22 @@
 import * as THREE from "three";
 
+export type MatchEvent = "kickoff" | "shot" | "danger" | "nearmiss";
+
+/** Estado sincronizado por red (posiciones normalizadas del rival y la pelota). */
+export interface NetState {
+  hx: number;
+  hz: number;
+  bx: number;
+  bz: number;
+}
+
+export interface NetLink {
+  /** true si este cliente es autoridad de la pelota */
+  isHost: boolean;
+  send: (s: NetState) => void;
+  latest: () => NetState | null;
+}
+
 export interface MatchOptions {
   teamShirt: number;
   teamShorts: number;
@@ -9,7 +26,10 @@ export interface MatchOptions {
   onGoal?: (side: "team" | "rival") => void;
   onClock: (minute: number) => void;
   onEnd: () => void;
+  onEvent?: (event: MatchEvent) => void;
+  net?: NetLink;
 }
+
 
 const SKIN = 0xf0b98a;
 const FIELD_X = 20;
@@ -565,9 +585,18 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
         kick(p.root.position, aim, 9);
       }
     };
-    chase(rival1, 4.4, -FIELD_X);
+    const remote = opts.net?.latest() ?? null;
+    if (remote) {
+      // El rival principal lo controla el otro jugador (eje espejado)
+      rival1.root.position.set(-remote.hx, 0, -remote.hz);
+      rival1.root.rotation.y = Math.PI;
+      animateLimbs(rival1, 0.7, dt);
+    } else {
+      chase(rival1, 4.4, -FIELD_X);
+    }
     chase(rival2, 3.6, -FIELD_X);
     chase(mate, 3.4, FIELD_X);
+
 
     // ---- acciones sobre la pelota ----
     const hb = new THREE.Vector3().subVectors(ball.position, hero.root.position);
@@ -580,8 +609,10 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       if (nearBall) {
         const aim = new THREE.Vector3(FIELD_X - ball.position.x, 0, -ball.position.z * 0.5);
         kick(hero.root.position, aim, 26);
+        opts.onEvent?.("shot");
       }
     }
+
     if (wantPass) {
       wantPass = false;
       if (nearBall) {
@@ -615,10 +646,29 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
         scoreGoal(ball.position.x > 0 ? "team" : "rival");
         if (celebrating <= 0) resetKickoff();
       } else {
+        if (Math.abs(ball.position.z) < GOAL_HALF + 2) opts.onEvent?.("nearmiss");
         ball.position.x = Math.sign(ball.position.x) * FIELD_X;
         ballVel.x *= -0.6;
       }
     }
+
+    // ---- ataque peligroso (relato) ----
+    if (ball.position.x > FIELD_X - 7 && ballVel.x > 4) opts.onEvent?.("danger");
+
+    // ---- sincronización de red ----
+    if (opts.net) {
+      opts.net.send({
+        hx: hero.root.position.x,
+        hz: hero.root.position.z,
+        bx: ball.position.x,
+        bz: ball.position.z,
+      });
+      if (!opts.net.isHost && remote) {
+        ball.position.x += (-remote.bx - ball.position.x) * Math.min(1, dt * 8);
+        ball.position.z += (-remote.bz - ball.position.z) * Math.min(1, dt * 8);
+      }
+    }
+
 
     // ---- cámara sigue al héroe ----
     const camTarget = new THREE.Vector3(
@@ -642,7 +692,9 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   }
 
   camera.position.set(0, 14, 21);
+  opts.onEvent?.("kickoff");
   frame();
+
 
   function resize() {
     const w = canvas.clientWidth || 1;

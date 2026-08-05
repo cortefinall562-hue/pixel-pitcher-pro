@@ -1,12 +1,16 @@
 import { lazy, Suspense, useState } from "react";
-import { Globe, Heart, Mail, X, Zap, Handshake, ShoppingBag } from "lucide-react";
+import { Globe, Heart, Mail, Zap, Handshake, ShoppingBag, Trophy } from "lucide-react";
 import { CLUBS, formatBudget, type Club } from "@/game/clubs";
 import type { Mail as MailData } from "@/game/career";
 import type { PackDef } from "@/game/packs";
 import type { MatchResult } from "@/components/MatchScreen";
+import { divisionFor, type OnlineState } from "@/game/online";
+import type { OnlineStart } from "@/components/OnlineLobby";
 
 const InboxModal = lazy(() => import("@/components/InboxModal"));
 const ShopModal = lazy(() => import("@/components/ShopModal"));
+const OnlineLobby = lazy(() => import("@/components/OnlineLobby"));
+
 
 
 
@@ -171,6 +175,9 @@ export default function SeasonHub({
   onRejectMail,
   onNegotiateMail,
   onBuyPack,
+  online,
+  onStartOnline,
+  openOnline = false,
 }: {
   managerName: string;
   club: Club;
@@ -184,8 +191,12 @@ export default function SeasonHub({
   onRejectMail: (mail: MailData) => void;
   onNegotiateMail: (mail: MailData) => void;
   onBuyPack: (pack: PackDef) => void;
+  online: OnlineState;
+  onStartOnline: (start: OnlineStart) => void;
+  openOnline?: boolean;
 }) {
-  const [showOnline, setShowOnline] = useState(false);
+
+  const [showOnline, setShowOnline] = useState(openOnline);
   const [showInbox, setShowInbox] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const unread = mails.filter((m) => !m.read).length;
@@ -240,6 +251,13 @@ export default function SeasonHub({
               <p className="field-label">Plantilla</p>
               <p className="text-sm font-semibold text-foreground">{squadSize} jugadores</p>
             </div>
+            <div>
+              <p className="field-label">Puntos liga online</p>
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-[#f5c53d]">
+                <Trophy size={13} /> {online.points} · {divisionFor(online.points)}
+              </p>
+            </div>
+
           </div>
           <div className="ml-auto flex items-center gap-3">
             <button
@@ -387,23 +405,21 @@ export default function SeasonHub({
         </aside>
       </div>
 
-      {/* MODAL ONLINE */}
+      {/* MODAL ONLINE 1v1 */}
       {showOnline && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-6 animate-fade-in">
-          <div className="panel w-full max-w-md animate-scale-in p-8 text-center">
-            <Globe size={36} className="mx-auto animate-spin text-turf" style={{ animationDuration: "4s" }} />
-            <h2 className="mt-4 font-display text-xl text-foreground">BUSCANDO SERVIDORES...</h2>
-            <p className="mt-3 text-sm text-muted-foreground">
-              Modo Online en desarrollo (Próximamente conexión de salas)
-            </p>
-            <button className="btn-ghost mt-7 w-full" onClick={() => setShowOnline(false)}>
-              <span className="flex items-center justify-center gap-2">
-                <X size={16} /> CERRAR
-              </span>
-            </button>
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <OnlineLobby
+            club={club}
+            online={online}
+            onClose={() => setShowOnline(false)}
+            onStart={(start) => {
+              setShowOnline(false);
+              onStartOnline(start);
+            }}
+          />
+        </Suspense>
       )}
+
 
       {/* MODAL TIENDA DE SOBRES */}
       {showShop && (
