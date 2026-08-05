@@ -646,10 +646,29 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
         scoreGoal(ball.position.x > 0 ? "team" : "rival");
         if (celebrating <= 0) resetKickoff();
       } else {
+        if (Math.abs(ball.position.z) < GOAL_HALF + 2) opts.onEvent?.("nearmiss");
         ball.position.x = Math.sign(ball.position.x) * FIELD_X;
         ballVel.x *= -0.6;
       }
     }
+
+    // ---- ataque peligroso (relato) ----
+    if (ball.position.x > FIELD_X - 7 && ballVel.x > 4) opts.onEvent?.("danger");
+
+    // ---- sincronización de red ----
+    if (opts.net) {
+      opts.net.send({
+        hx: hero.root.position.x,
+        hz: hero.root.position.z,
+        bx: ball.position.x,
+        bz: ball.position.z,
+      });
+      if (!opts.net.isHost && remote) {
+        ball.position.x += (-remote.bx - ball.position.x) * Math.min(1, dt * 8);
+        ball.position.z += (-remote.bz - ball.position.z) * Math.min(1, dt * 8);
+      }
+    }
+
 
     // ---- cámara sigue al héroe ----
     const camTarget = new THREE.Vector3(
