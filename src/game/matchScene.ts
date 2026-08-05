@@ -585,9 +585,18 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
         kick(p.root.position, aim, 9);
       }
     };
-    chase(rival1, 4.4, -FIELD_X);
+    const remote = opts.net?.latest() ?? null;
+    if (remote) {
+      // El rival principal lo controla el otro jugador (eje espejado)
+      rival1.root.position.set(-remote.hx, 0, -remote.hz);
+      rival1.root.rotation.y = Math.PI;
+      animateLimbs(rival1, 0.7, dt);
+    } else {
+      chase(rival1, 4.4, -FIELD_X);
+    }
     chase(rival2, 3.6, -FIELD_X);
     chase(mate, 3.4, FIELD_X);
+
 
     // ---- acciones sobre la pelota ----
     const hb = new THREE.Vector3().subVectors(ball.position, hero.root.position);
