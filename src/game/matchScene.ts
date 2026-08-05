@@ -1,5 +1,22 @@
 import * as THREE from "three";
 
+export type MatchEvent = "kickoff" | "shot" | "danger" | "nearmiss";
+
+/** Estado sincronizado por red (posiciones normalizadas del rival y la pelota). */
+export interface NetState {
+  hx: number;
+  hz: number;
+  bx: number;
+  bz: number;
+}
+
+export interface NetLink {
+  /** true si este cliente es autoridad de la pelota */
+  isHost: boolean;
+  send: (s: NetState) => void;
+  latest: () => NetState | null;
+}
+
 export interface MatchOptions {
   teamShirt: number;
   teamShorts: number;
@@ -9,7 +26,10 @@ export interface MatchOptions {
   onGoal?: (side: "team" | "rival") => void;
   onClock: (minute: number) => void;
   onEnd: () => void;
+  onEvent?: (event: MatchEvent) => void;
+  net?: NetLink;
 }
+
 
 const SKIN = 0xf0b98a;
 const FIELD_X = 20;
