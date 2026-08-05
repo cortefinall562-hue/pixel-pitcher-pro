@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react";
-import { Globe, Heart, Mail, X, Zap, Handshake, ShoppingBag, Trophy } from "lucide-react";
+import { Globe, Heart, Mail, Zap, Handshake, ShoppingBag, Trophy } from "lucide-react";
 import { CLUBS, formatBudget, type Club } from "@/game/clubs";
 import type { Mail as MailData } from "@/game/career";
 import type { PackDef } from "@/game/packs";
