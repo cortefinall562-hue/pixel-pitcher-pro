@@ -19,6 +19,19 @@ import {
   type OfferData,
 } from "@/game/career";
 import { rollCard, type PackDef, type PlayerCard } from "@/game/packs";
+import {
+  applyOutcome,
+  loadOnline,
+  openRoom,
+  saveOnline,
+  emptyOnline,
+  REWARDS,
+  divisionFor,
+  type OnlineState,
+  type RoomLink,
+} from "@/game/online";
+import type { OnlineStart } from "@/components/OnlineLobby";
+import type { OnlineSession } from "@/components/MatchScreen";
 
 const CoachCanvas = lazy(() => import("@/components/CoachCanvas"));
 const SeasonHub = lazy(() => import("@/components/SeasonHub"));
@@ -69,6 +82,8 @@ function Index() {
   const [career, setCareer] = useState<CareerState | null>(null);
   const [pendingOffer, setPendingOffer] = useState<{ mailId: string; offer: OfferData } | null>(null);
   const [pendingPack, setPendingPack] = useState<{ pack: PackDef; card: PlayerCard } | null>(null);
+  const [online, setOnline] = useState<OnlineState>(emptyOnline);
+  const [session, setSession] = useState<OnlineSession | null>(null);
 
   const editorClub = getClub(clubId);
   const club = getClub(career?.clubId ?? clubId);
@@ -90,6 +105,14 @@ function Index() {
   useEffect(() => {
     if (career) saveCareer(career);
   }, [career]);
+
+  useEffect(() => {
+    setOnline(loadOnline());
+  }, []);
+
+  useEffect(() => {
+    saveOnline(online);
+  }, [online]);
 
   const startCareer = () => {
     const stored = loadCareer();
@@ -270,7 +293,53 @@ function Index() {
     setScreen("season");
   };
 
+  const startOnlineMatch = (start: OnlineStart) => {
+    const link: RoomLink = openRoom(start.code, start.isHost);
+    setRivalName(start.rivalName);
+    setSession({
+      link,
+      points: online.points,
+      division: divisionFor(online.points),
+      mode: start.mode,
+    });
+    setScreen("match");
+  };
+
   const handleMatchExit = (result: MatchResult) => {
+    if (result.online) {
+      const final = result.walkover ? { ...result, team: 3, rival: 0 } : result;
+      const outcome: "win" | "draw" | "loss" = result.walkover
+        ? "win"
+        : final.team > final.rival
+          ? "win"
+          : final.team === final.rival
+            ? "draw"
+            : "loss";
+      const reward = REWARDS[outcome];
+      setOnline((o) => applyOutcome(o, outcome));
+      setSession(null);
+      setLastResult(final);
+      patch((c) => ({
+        ...c,
+        budget: c.budget + reward.coins,
+        mails: [
+          {
+            id: `online-${Date.now()}`,
+            kind: "report" as const,
+            sender: "Liga Online · Táctica FC",
+            subject: `Partido online: ${outcome === "win" ? "victoria" : outcome === "draw" ? "empate" : "derrota"} ${final.team}-${final.rival}`,
+            body: `${getClub(c.clubId).name} ${final.team} - ${final.rival} ${final.rivalName}${result.walkover ? " (abandono del rival)" : ""}. Puntos de liga: ${reward.points > 0 ? "+" : ""}${reward.points}. Bono: ${formatCoins(reward.coins)}.`,
+            time: "Ahora",
+            read: false,
+            archived: false,
+          },
+          ...c.mails,
+        ],
+      }));
+      setScreen("season");
+      return;
+    }
+
     setLastResult(result);
     const won = result.team > result.rival;
     patch((c) => {
@@ -335,7 +404,12 @@ function Index() {
     return (
       <ClientOnly fallback={<div className="min-h-screen bg-sky" />}>
         <Suspense fallback={<div className="min-h-screen bg-sky" />}>
-          <MatchScreen club={club} rival={rival} onExit={handleMatchExit} />
+          <MatchScreen
+            club={club}
+            rival={rival}
+            {...(session ? { online: session } : {})}
+            onExit={handleMatchExit}
+          />
         </Suspense>
       </ClientOnly>
     );
@@ -366,6 +440,8 @@ function Index() {
             onRejectMail={(m) => resolveMail(m.id, "rejected")}
             onNegotiateMail={handleNegotiate}
             onBuyPack={handleBuyPack}
+            online={online}
+            onStartOnline={startOnlineMatch}
           />
         </div>
       </Suspense>
