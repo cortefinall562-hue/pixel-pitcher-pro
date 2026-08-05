@@ -614,7 +614,7 @@ function Index() {
               </div>
             </div>
 
-            <button className="btn-play w-full" onClick={startCareer}>
+            <button className="btn-play w-full" onClick={() => startCareer()}>
               GUARDAR Y CONTINUAR
             </button>
           </div>
