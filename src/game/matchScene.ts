@@ -692,7 +692,9 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   }
 
   camera.position.set(0, 14, 21);
+  opts.onEvent?.("kickoff");
   frame();
+
 
   function resize() {
     const w = canvas.clientWidth || 1;
