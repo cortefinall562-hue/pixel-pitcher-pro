@@ -56,10 +56,11 @@ export const DIVISIONS = [
 ] as const;
 
 export function divisionFor(points: number) {
-  let current = DIVISIONS[0]!;
+  let current: (typeof DIVISIONS)[number] = DIVISIONS[0];
   for (const d of DIVISIONS) if (points >= d.min) current = d;
   return current.name;
 }
+
 
 export type OnlineOutcome = "win" | "draw" | "loss";
 
