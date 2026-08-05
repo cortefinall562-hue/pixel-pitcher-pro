@@ -600,8 +600,10 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       if (nearBall) {
         const aim = new THREE.Vector3(FIELD_X - ball.position.x, 0, -ball.position.z * 0.5);
         kick(hero.root.position, aim, 26);
+        opts.onEvent?.("shot");
       }
     }
+
     if (wantPass) {
       wantPass = false;
       if (nearBall) {
