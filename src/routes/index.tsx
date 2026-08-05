@@ -114,7 +114,10 @@ function Index() {
     saveOnline(online);
   }, [online]);
 
-  const startCareer = () => {
+  const [openOnline, setOpenOnline] = useState(false);
+
+  const startCareer = (withOnline = false) => {
+    setOpenOnline(withOnline);
     const stored = loadCareer();
     setCareer(
       stored && stored.clubId === clubId
@@ -442,6 +445,7 @@ function Index() {
             onBuyPack={handleBuyPack}
             online={online}
             onStartOnline={startOnlineMatch}
+            openOnline={openOnline}
           />
         </div>
       </Suspense>
@@ -469,6 +473,12 @@ function Index() {
             <div className="max-w-sm space-y-4">
               <button className="btn-play w-full" onClick={() => setScreen("editor")}>
                 JUGAR
+              </button>
+              <button
+                className="btn-ghost w-full"
+                onClick={() => startCareer(true)}
+              >
+                🌐 MODO ONLINE CARA A CARA
               </button>
               <button className="btn-ghost w-full" onClick={() => setScreen("settings")}>
                 CONFIGURACIÓN
