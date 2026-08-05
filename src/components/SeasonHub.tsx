@@ -175,6 +175,8 @@ export default function SeasonHub({
   onRejectMail,
   onNegotiateMail,
   onBuyPack,
+  online,
+  onStartOnline,
 }: {
   managerName: string;
   club: Club;
@@ -188,7 +190,10 @@ export default function SeasonHub({
   onRejectMail: (mail: MailData) => void;
   onNegotiateMail: (mail: MailData) => void;
   onBuyPack: (pack: PackDef) => void;
+  online: OnlineState;
+  onStartOnline: (start: OnlineStart) => void;
 }) {
+
   const [showOnline, setShowOnline] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
   const [showShop, setShowShop] = useState(false);
