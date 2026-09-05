@@ -1,4 +1,6 @@
 import { CLUBS, getClub, type Club } from "@/game/clubs";
+import type { CupState } from "@/game/tournament";
+import type { Prospect, ScoutMission } from "@/game/scouting";
 
 export type Position = "POR" | "DEF" | "MED" | "DEL";
 
@@ -43,7 +45,7 @@ export interface Mail {
 }
 
 export interface CareerState {
-  version: 3;
+  version: 4;
   managerName: string;
   clubId: string;
   budget: number;
@@ -51,9 +53,15 @@ export interface CareerState {
   mails: Mail[];
   wins: number;
   trophies: number;
+  /** Copa por eliminación directa en curso */
+  cup: CupState | null;
+  /** Ojeadores en misión */
+  scouts: ScoutMission[];
+  /** Juveniles detectados listos para fichar */
+  prospects: Prospect[];
 }
 
-const KEY = "tacticafc.career.v3";
+const KEY = "tacticafc.career.v4";
 
 const FIRST = [
   "Lucas", "Mateo", "Bruno", "Iker", "Diego", "Nahuel", "Tomás", "Andrés",
@@ -203,13 +211,16 @@ export function initialCareer(managerName: string, clubId: string): CareerState 
   const club = getClub(clubId);
   const squad = buildSquad(club);
   return {
-    version: 3,
+    version: 4,
     managerName,
     clubId,
     budget: club.budget,
     squad,
     wins: 0,
     trophies: 0,
+    cup: null,
+    scouts: [],
+    prospects: [],
     mails: [
       {
         id: mailId(),
@@ -233,8 +244,13 @@ export function loadCareer(): CareerState | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CareerState;
-    if (parsed?.version !== 3) return null;
-    return parsed;
+    if (parsed?.version !== 4) return null;
+    return {
+      ...parsed,
+      cup: parsed.cup ?? null,
+      scouts: parsed.scouts ?? [],
+      prospects: parsed.prospects ?? [],
+    };
   } catch {
     return null;
   }
