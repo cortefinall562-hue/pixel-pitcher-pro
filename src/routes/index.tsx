@@ -31,6 +31,20 @@ import {
   type RoomLink,
 } from "@/game/online";
 import type { OnlineStart } from "@/components/OnlineLobby";
+import {
+  applyPlayerResult,
+  createCup,
+  CUP_PRIZES,
+  playerMatch,
+  ROUND_NAMES,
+} from "@/game/tournament";
+import {
+  generateProspects,
+  getRegion,
+  startMission,
+  tickMissions,
+  type Prospect,
+} from "@/game/scouting";
 import type { OnlineSession } from "@/components/MatchScreen";
 
 const CoachCanvas = lazy(() => import("@/components/CoachCanvas"));
@@ -84,6 +98,7 @@ function Index() {
   const [pendingPack, setPendingPack] = useState<{ pack: PackDef; card: PlayerCard } | null>(null);
   const [online, setOnline] = useState<OnlineState>(emptyOnline);
   const [session, setSession] = useState<OnlineSession | null>(null);
+  const [cupMatch, setCupMatch] = useState(false);
 
   const editorClub = getClub(clubId);
   const club = getClub(career?.clubId ?? clubId);
@@ -296,6 +311,113 @@ function Index() {
     setScreen("season");
   };
 
+  // ---- Copa por eliminación directa ----
+  const handleCreateCup = () => {
+    patch((c) => ({ ...c, cup: createCup(c.clubId, (c.cup?.season ?? 0) + 1) }));
+  };
+
+  const handlePlayCup = (rivalName: string) => {
+    setRivalName(rivalName);
+    setCupMatch(true);
+    setSession(null);
+    setScreen("match");
+  };
+
+  // ---- Ojeadores y juveniles ----
+  const handleSendScout = (regionId: string, focus: Prospect["pos"] | "any") => {
+    const region = getRegion(regionId);
+    patch((c) => {
+      if (c.budget < region.cost) return c;
+      return {
+        ...c,
+        budget: c.budget - region.cost,
+        scouts: [...c.scouts, startMission(regionId, focus)],
+        mails: [
+          {
+            id: `scout-${Date.now()}`,
+            kind: "report" as const,
+            sender: "Dirección de Cantera",
+            subject: `Ojeador enviado a ${region.name}`,
+            body: `Misión abierta en ${region.name} buscando ${focus === "any" ? "cualquier puesto" : focus}. Coste: ${formatCoins(region.cost)}. El informe llegará en ${region.matches} partidos.`,
+            time: "Ahora",
+            read: false,
+            archived: false,
+          },
+          ...c.mails,
+        ],
+      };
+    });
+  };
+
+  const handleSignProspect = (p: Prospect) => {
+    patch((c) => {
+      if (c.budget < p.value) return c;
+      return {
+        ...c,
+        budget: c.budget - p.value,
+        prospects: c.prospects.filter((x) => x.id !== p.id),
+        squad: [
+          ...c.squad,
+          {
+            id: p.id,
+            name: p.name,
+            pos: p.pos,
+            ovr: p.ovr,
+            value: p.value,
+            starter: false,
+          },
+        ],
+        mails: [
+          {
+            id: `youth-${p.id}`,
+            kind: "report" as const,
+            sender: "Dirección de Cantera",
+            subject: `Juvenil fichado: ${p.name} (${p.ovr}/${p.potential})`,
+            body: `${p.name}, ${p.age} años, ${p.pos}. Potencial ${p.potential}. ${p.trait}. Coste: ${formatCoins(p.value)}. Ya entrena con el primer equipo.`,
+            time: "Ahora",
+            read: false,
+            archived: false,
+          },
+          ...c.mails,
+        ],
+      };
+    });
+  };
+
+  const handleDiscardProspect = (id: string) =>
+    patch((c) => ({ ...c, prospects: c.prospects.filter((p) => p.id !== id) }));
+
+  /** Avanza las misiones de ojeo tras cada partido. */
+  const advanceScouting = (c: CareerState): CareerState => {
+    if (c.scouts.length === 0) return c;
+    const { missions, finished } = tickMissions(c.scouts);
+    if (finished.length === 0) return { ...c, scouts: missions };
+    const found = finished.flatMap((m) => generateProspects(m));
+    return {
+      ...c,
+      scouts: missions,
+      prospects: [...found, ...c.prospects],
+      mails: [
+        {
+          id: `report-${Date.now()}`,
+          kind: "report" as const,
+          sender: "Dirección de Cantera",
+          subject: `Informe de ojeo: ${found.length} promesa${found.length > 1 ? "s" : ""}`,
+          body: found
+            .map(
+              (p) =>
+                `${p.name} — ${p.pos}, ${p.age} años, ${p.ovr} GRL (potencial ${p.potential}). ${p.trait}. Pide ${formatCoins(p.value)}.`,
+            )
+            .join(" · "),
+          time: "Ahora",
+          read: false,
+          archived: false,
+        },
+        ...c.mails,
+      ],
+    };
+  };
+
   const startOnlineMatch = (start: OnlineStart) => {
     const link: RoomLink = openRoom(start.code, start.isHost);
     setRivalName(start.rivalName);
@@ -345,12 +467,55 @@ function Index() {
 
     setLastResult(result);
     const won = result.team > result.rival;
+
+    if (cupMatch) {
+      setCupMatch(false);
+      patch((c) => {
+        if (!c.cup) return c;
+        const before = c.cup;
+        const round = before.roundIndex;
+        const cup = applyPlayerResult(before, c.clubId, result.team, result.rival);
+        const stillIn =
+          cup.champion === c.clubId || !!playerMatch(cup, c.clubId);
+        const prize = stillIn ? CUP_PRIZES[Math.min(round, CUP_PRIZES.length - 1)]! : 400_000;
+        const champion = cup.champion === c.clubId;
+        return advanceScouting({
+          ...c,
+          cup,
+          wins: c.wins + (won ? 1 : 0),
+          trophies: c.trophies + (champion ? 1 : 0),
+          budget: c.budget + prize + (champion ? 12_000_000 : 0),
+          mails: [
+            {
+              id: `cup-${Date.now()}`,
+              kind: "report" as const,
+              sender: "Comité de la Copa Continental",
+              subject: champion
+                ? `¡CAMPEONES DE LA COPA CONTINENTAL!`
+                : stillIn
+                  ? `Clasificados: ${ROUND_NAMES[Math.min(round + 1, ROUND_NAMES.length - 1)]}`
+                  : `Eliminados en ${ROUND_NAMES[Math.min(round, ROUND_NAMES.length - 1)]}`,
+              body: champion
+                ? `Levantaron el trofeo tras ganar ${result.team}-${result.rival} a ${result.rivalName}. Premio total acreditado: ${formatCoins(prize + 12_000_000)}.`
+                : `Resultado ${getClub(c.clubId).name} ${result.team} - ${result.rival} ${result.rivalName}. Ingresos por la participación: ${formatCoins(prize)}.`,
+              time: "Ahora",
+              read: false,
+              archived: false,
+            },
+            ...c.mails,
+          ],
+        });
+      });
+      setScreen("season");
+      return;
+    }
+
     patch((c) => {
       const current = getClub(c.clubId);
       const prize = won ? 1_500_000 : result.team === result.rival ? 600_000 : 200_000;
       const extra: Mail[] = [makeSellOfferMail(current, c.squad, c.mails.length)];
       if (won && (c.wins + 1) % 2 === 0) extra.push(makeJobOfferMail(current));
-      return {
+      return advanceScouting({
         ...c,
         wins: c.wins + (won ? 1 : 0),
         budget: c.budget + prize,
@@ -368,7 +533,7 @@ function Index() {
           ...extra,
           ...c.mails,
         ],
-      };
+      });
     });
     setScreen("season");
   };
@@ -431,6 +596,8 @@ function Index() {
             lastResult={lastResult}
             onPlayMatch={(r) => {
               setRivalName(r);
+              setCupMatch(false);
+              setSession(null);
               setScreen("match");
             }}
             onOpenMail={(id) =>
@@ -446,6 +613,15 @@ function Index() {
             online={online}
             onStartOnline={startOnlineMatch}
             openOnline={openOnline}
+            cup={career.cup}
+            trophies={career.trophies}
+            onCreateCup={handleCreateCup}
+            onPlayCup={handlePlayCup}
+            scouts={career.scouts}
+            prospects={career.prospects}
+            onSendScout={handleSendScout}
+            onSignProspect={handleSignProspect}
+            onDiscardProspect={handleDiscardProspect}
           />
         </div>
       </Suspense>
