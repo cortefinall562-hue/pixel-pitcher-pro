@@ -428,6 +428,50 @@ export default function SeasonHub({
             </div>
           </section>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <section className="panel relative overflow-hidden p-5">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#f5c53d]/20 blur-3xl" />
+              <p className="field-label">Copa Continental</p>
+              {cup && !cup.champion && cupNext ? (
+                <>
+                  <p className="mt-2 font-display text-lg text-foreground">{cupRound?.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Rival: {cupNext.home === club.id ? cupNext.away : cupNext.home}
+                  </p>
+                </>
+              ) : cup?.champion === club.id ? (
+                <p className="mt-2 font-display text-lg text-[#f5c53d]">¡CAMPEÓN!</p>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  8 equipos, eliminación directa, un solo trofeo.
+                </p>
+              )}
+              <button
+                onClick={() => setShowCup(true)}
+                className="mt-4 flex items-center gap-2 font-display text-xs tracking-widest text-[#f5c53d] hover:underline"
+              >
+                <Trophy size={14} /> VER CUADRO
+              </button>
+            </section>
+
+            <section className="panel relative overflow-hidden p-5">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-turf/20 blur-3xl" />
+              <p className="field-label">Red de ojeadores</p>
+              <p className="mt-2 font-display text-lg text-foreground">
+                {scouts.length} en misión · {prospects.length} promesas
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Los informes llegan al terminar partidos.
+              </p>
+              <button
+                onClick={() => setShowScouts(true)}
+                className="mt-4 flex items-center gap-2 font-display text-xs tracking-widest text-turf hover:underline"
+              >
+                <Radar size={14} /> GESTIONAR OJEADORES
+              </button>
+            </section>
+          </div>
+
           <section className="panel p-5">
             <div className="flex items-center gap-2">
               <p className="field-label">Bandeja de Entrada</p>
