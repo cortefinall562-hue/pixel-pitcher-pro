@@ -1,15 +1,21 @@
 import { lazy, Suspense, useState } from "react";
-import { Globe, Heart, Mail, Zap, Handshake, ShoppingBag, Trophy } from "lucide-react";
+import { Globe, Heart, Mail, Zap, Handshake, ShoppingBag, Trophy, Binoculars, Radar } from "lucide-react";
 import { CLUBS, formatBudget, type Club } from "@/game/clubs";
 import type { Mail as MailData } from "@/game/career";
 import type { PackDef } from "@/game/packs";
 import type { MatchResult } from "@/components/MatchScreen";
 import { divisionFor, type OnlineState } from "@/game/online";
 import type { OnlineStart } from "@/components/OnlineLobby";
+import type { CupState } from "@/game/tournament";
+import { currentRound, playerMatch } from "@/game/tournament";
+import type { Position } from "@/game/career";
+import type { Prospect, ScoutMission } from "@/game/scouting";
 
 const InboxModal = lazy(() => import("@/components/InboxModal"));
 const ShopModal = lazy(() => import("@/components/ShopModal"));
 const OnlineLobby = lazy(() => import("@/components/OnlineLobby"));
+const CupModal = lazy(() => import("@/components/CupModal"));
+const ScoutingModal = lazy(() => import("@/components/ScoutingModal"));
 
 
 
@@ -51,6 +57,37 @@ function Crest({ team, size = 64 }: { team: string; size?: number }) {
       >
         {initials}
       </span>
+      {/* MODAL COPA */}
+      {showCup && (
+        <Suspense fallback={null}>
+          <CupModal
+            club={club}
+            cup={cup}
+            onCreate={onCreateCup}
+            onPlay={(rivalName) => {
+              setShowCup(false);
+              onPlayCup(rivalName);
+            }}
+            onClose={() => setShowCup(false)}
+          />
+        </Suspense>
+      )}
+
+      {/* MODAL OJEADORES */}
+      {showScouts && (
+        <Suspense fallback={null}>
+          <ScoutingModal
+            budget={budget}
+            scouts={scouts}
+            prospects={prospects}
+            onSend={onSendScout}
+            onSign={onSignProspect}
+            onDiscard={onDiscardProspect}
+            onClose={() => setShowScouts(false)}
+          />
+        </Suspense>
+      )}
+
     </div>
   );
 }
@@ -178,6 +215,15 @@ export default function SeasonHub({
   online,
   onStartOnline,
   openOnline = false,
+  cup,
+  trophies,
+  onCreateCup,
+  onPlayCup,
+  scouts,
+  prospects,
+  onSendScout,
+  onSignProspect,
+  onDiscardProspect,
 }: {
   managerName: string;
   club: Club;
@@ -194,11 +240,24 @@ export default function SeasonHub({
   online: OnlineState;
   onStartOnline: (start: OnlineStart) => void;
   openOnline?: boolean;
+  cup: CupState | null;
+  trophies: number;
+  onCreateCup: () => void;
+  onPlayCup: (rivalName: string) => void;
+  scouts: ScoutMission[];
+  prospects: Prospect[];
+  onSendScout: (regionId: string, focus: Position | "any") => void;
+  onSignProspect: (p: Prospect) => void;
+  onDiscardProspect: (id: string) => void;
 }) {
 
   const [showOnline, setShowOnline] = useState(openOnline);
   const [showInbox, setShowInbox] = useState(false);
   const [showShop, setShowShop] = useState(false);
+  const [showCup, setShowCup] = useState(false);
+  const [showScouts, setShowScouts] = useState(false);
+  const cupNext = cup ? playerMatch(cup, club.id) : null;
+  const cupRound = cup ? currentRound(cup) : null;
   const unread = mails.filter((m) => !m.read).length;
   const fixtures = buildFixtures(club);
   const next = fixtures[0]!;
@@ -252,6 +311,12 @@ export default function SeasonHub({
               <p className="text-sm font-semibold text-foreground">{squadSize} jugadores</p>
             </div>
             <div>
+              <p className="field-label">Trofeos</p>
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-[#f5c53d]">
+                <Trophy size={13} /> {trophies}
+              </p>
+            </div>
+            <div>
               <p className="field-label">Puntos liga online</p>
               <p className="flex items-center gap-1.5 text-sm font-semibold text-[#f5c53d]">
                 <Trophy size={13} /> {online.points} · {divisionFor(online.points)}
@@ -268,6 +333,23 @@ export default function SeasonHub({
               {unread > 0 && (
                 <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-foreground">
                   {unread}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowCup(true)}
+              className="flex items-center gap-2 rounded-xl border border-[#f5c53d]/40 bg-[#f5c53d]/10 px-4 py-2 font-display text-xs tracking-widest text-[#f5c53d] transition-shadow hover:shadow-[0_0_24px_rgb(245_197_61/0.35)]"
+            >
+              <Trophy size={16} /> COPA
+            </button>
+            <button
+              onClick={() => setShowScouts(true)}
+              className="relative flex items-center gap-2 rounded-xl border border-border bg-secondary/60 px-4 py-2 font-display text-xs tracking-widest text-foreground transition-colors hover:border-turf/60"
+            >
+              <Binoculars size={16} /> OJEADORES
+              {prospects.length > 0 && (
+                <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-turf px-1 text-[10px] font-bold text-black">
+                  {prospects.length}
                 </span>
               )}
             </button>
@@ -448,6 +530,37 @@ export default function SeasonHub({
               setShowInbox(false);
               onNegotiateMail(m);
             }}
+          />
+        </Suspense>
+      )}
+
+      {/* MODAL COPA */}
+      {showCup && (
+        <Suspense fallback={null}>
+          <CupModal
+            club={club}
+            cup={cup}
+            onCreate={onCreateCup}
+            onPlay={(rivalName) => {
+              setShowCup(false);
+              onPlayCup(rivalName);
+            }}
+            onClose={() => setShowCup(false)}
+          />
+        </Suspense>
+      )}
+
+      {/* MODAL OJEADORES */}
+      {showScouts && (
+        <Suspense fallback={null}>
+          <ScoutingModal
+            budget={budget}
+            scouts={scouts}
+            prospects={prospects}
+            onSend={onSendScout}
+            onSign={onSignProspect}
+            onDiscard={onDiscardProspect}
+            onClose={() => setShowScouts(false)}
           />
         </Suspense>
       )}
