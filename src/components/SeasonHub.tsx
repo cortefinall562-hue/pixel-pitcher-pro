@@ -57,37 +57,6 @@ function Crest({ team, size = 64 }: { team: string; size?: number }) {
       >
         {initials}
       </span>
-      {/* MODAL COPA */}
-      {showCup && (
-        <Suspense fallback={null}>
-          <CupModal
-            club={club}
-            cup={cup}
-            onCreate={onCreateCup}
-            onPlay={(rivalName) => {
-              setShowCup(false);
-              onPlayCup(rivalName);
-            }}
-            onClose={() => setShowCup(false)}
-          />
-        </Suspense>
-      )}
-
-      {/* MODAL OJEADORES */}
-      {showScouts && (
-        <Suspense fallback={null}>
-          <ScoutingModal
-            budget={budget}
-            scouts={scouts}
-            prospects={prospects}
-            onSend={onSendScout}
-            onSign={onSignProspect}
-            onDiscard={onDiscardProspect}
-            onClose={() => setShowScouts(false)}
-          />
-        </Suspense>
-      )}
-
     </div>
   );
 }
@@ -574,6 +543,37 @@ export default function SeasonHub({
               setShowInbox(false);
               onNegotiateMail(m);
             }}
+          />
+        </Suspense>
+      )}
+
+      {/* MODAL COPA */}
+      {showCup && (
+        <Suspense fallback={null}>
+          <CupModal
+            club={club}
+            cup={cup}
+            onCreate={onCreateCup}
+            onPlay={(rivalName) => {
+              setShowCup(false);
+              onPlayCup(rivalName);
+            }}
+            onClose={() => setShowCup(false)}
+          />
+        </Suspense>
+      )}
+
+      {/* MODAL OJEADORES */}
+      {showScouts && (
+        <Suspense fallback={null}>
+          <ScoutingModal
+            budget={budget}
+            scouts={scouts}
+            prospects={prospects}
+            onSend={onSendScout}
+            onSign={onSignProspect}
+            onDiscard={onDiscardProspect}
+            onClose={() => setShowScouts(false)}
           />
         </Suspense>
       )}
