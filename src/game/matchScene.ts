@@ -318,16 +318,31 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   scene.add(ball);
   const ballVel = new THREE.Vector3();
 
-  // ---- Jugadores ----
-  const hero = createPlayer(opts.teamShirt, opts.teamShorts);
-  hero.root.position.set(-4, 0, 2);
-  const mate = createPlayer(opts.teamShirt, opts.teamShorts);
-  mate.root.position.set(-9, 0, -5);
-  const rival1 = createPlayer(opts.rivalShirt, opts.rivalShorts);
-  rival1.root.position.set(5, 0, -3);
-  const rival2 = createPlayer(opts.rivalShirt, opts.rivalShorts);
-  rival2.root.position.set(9, 0, 4);
-  for (const p of [hero, mate, rival1, rival2]) scene.add(p.root);
+  // ---- Jugadores (equipo ataca hacia +X, rival hacia -X) ----
+  const teamP = (role: Role, x: number, z: number) =>
+    createPlayer(opts.teamShirt, opts.teamShorts, role, new THREE.Vector3(x, 0, z), 1);
+  const rivalP = (role: Role, x: number, z: number) =>
+    createPlayer(opts.rivalShirt, opts.rivalShorts, role, new THREE.Vector3(x, 0, z), -1);
+
+  const hero = teamP("mid", -4, 2);
+  const mate = teamP("fwd", 6, -5);
+  const mate2 = teamP("mid", -8, 5);
+  const back = teamP("def", -14, 0);
+  const keeper = teamP("gk", -FIELD_X + 1.1, 0);
+
+  const rival1 = rivalP("fwd", 5, -3);
+  const rival2 = rivalP("mid", 9, 4);
+  const rival3 = rivalP("def", 14, -1);
+  const rivalKeeper = rivalP("gk", FIELD_X - 1.1, 0);
+  rival1.root.rotation.y = Math.PI;
+  rival2.root.rotation.y = Math.PI;
+  rival3.root.rotation.y = Math.PI;
+  rivalKeeper.root.rotation.y = Math.PI;
+
+  const teamMates = [mate, mate2, back, keeper];
+  const rivals = [rival1, rival2, rival3, rivalKeeper];
+  const everyone = [hero, ...teamMates, ...rivals];
+  for (const p of everyone) scene.add(p.root);
 
   const marker = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.09, 6, 24), mat(0xfdf14a));
   marker.rotation.x = Math.PI / 2;
