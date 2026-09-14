@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react";
-import { Globe, Heart, Mail, Zap, Handshake, ShoppingBag, Trophy, Binoculars, Radar } from "lucide-react";
+import { Globe, Heart, Mail, Zap, Handshake, ShoppingBag, Trophy, Binoculars, Radar, PartyPopper } from "lucide-react";
 import { CLUBS, formatBudget, type Club } from "@/game/clubs";
 import type { Mail as MailData } from "@/game/career";
 import type { PackDef } from "@/game/packs";
@@ -16,6 +16,7 @@ const ShopModal = lazy(() => import("@/components/ShopModal"));
 const OnlineLobby = lazy(() => import("@/components/OnlineLobby"));
 const CupModal = lazy(() => import("@/components/CupModal"));
 const ScoutingModal = lazy(() => import("@/components/ScoutingModal"));
+const CelebrationsModal = lazy(() => import("@/components/CelebrationsModal"));
 
 
 
@@ -193,6 +194,7 @@ export default function SeasonHub({
   onSendScout,
   onSignProspect,
   onDiscardProspect,
+  onSpendCoins,
 }: {
   managerName: string;
   club: Club;
@@ -218,6 +220,7 @@ export default function SeasonHub({
   onSendScout: (regionId: string, focus: Position | "any") => void;
   onSignProspect: (p: Prospect) => void;
   onDiscardProspect: (id: string) => void;
+  onSpendCoins: (amount: number) => void;
 }) {
 
   const [showOnline, setShowOnline] = useState(openOnline);
@@ -225,6 +228,7 @@ export default function SeasonHub({
   const [showShop, setShowShop] = useState(false);
   const [showCup, setShowCup] = useState(false);
   const [showScouts, setShowScouts] = useState(false);
+  const [showCelebs, setShowCelebs] = useState(false);
   const cupNext = cup ? playerMatch(cup, club.id) : null;
   const cupRound = cup ? currentRound(cup) : null;
   const unread = mails.filter((m) => !m.read).length;
@@ -321,6 +325,12 @@ export default function SeasonHub({
                   {prospects.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setShowCelebs(true)}
+              className="flex items-center gap-2 rounded-xl border border-[#c084fc]/40 bg-[#c084fc]/10 px-4 py-2 font-display text-xs tracking-widest text-[#c084fc] transition-shadow hover:shadow-[0_0_24px_rgb(192_132_252/0.35)]"
+            >
+              <PartyPopper size={16} /> FESTEJOS
             </button>
             <button
               onClick={() => setShowShop(true)}
@@ -578,33 +588,13 @@ export default function SeasonHub({
         </Suspense>
       )}
 
-      {/* MODAL COPA */}
-      {showCup && (
+      {/* MODAL FESTEJOS */}
+      {showCelebs && (
         <Suspense fallback={null}>
-          <CupModal
-            club={club}
-            cup={cup}
-            onCreate={onCreateCup}
-            onPlay={(rivalName) => {
-              setShowCup(false);
-              onPlayCup(rivalName);
-            }}
-            onClose={() => setShowCup(false)}
-          />
-        </Suspense>
-      )}
-
-      {/* MODAL OJEADORES */}
-      {showScouts && (
-        <Suspense fallback={null}>
-          <ScoutingModal
+          <CelebrationsModal
             budget={budget}
-            scouts={scouts}
-            prospects={prospects}
-            onSend={onSendScout}
-            onSign={onSignProspect}
-            onDiscard={onDiscardProspect}
-            onClose={() => setShowScouts(false)}
+            onBuy={onSpendCoins}
+            onClose={() => setShowCelebs(false)}
           />
         </Suspense>
       )}
