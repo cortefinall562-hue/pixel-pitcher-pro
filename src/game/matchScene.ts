@@ -49,6 +49,9 @@ function cyl(r: number, h: number, color: number) {
   return new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 8), mat(color));
 }
 
+type Role = "gk" | "def" | "mid" | "fwd";
+type KickKind = "pass" | "power" | "finesse";
+
 interface Player {
   root: THREE.Group;
   legL: THREE.Group;
@@ -57,6 +60,16 @@ interface Player {
   armR: THREE.Group;
   vel: THREE.Vector3;
   phase: number;
+  /** tiempo restante de la animación de patada */
+  kickT: number;
+  kickDur: number;
+  kickKind: KickKind;
+  /** enfriamiento antes de volver a tocar la pelota */
+  cooldown: number;
+  role: Role;
+  home: THREE.Vector3;
+  /** 1 = ataca hacia +X, -1 = ataca hacia -X */
+  side: number;
 }
 
 function createPlayer(shirt: number, shorts: number): Player {
