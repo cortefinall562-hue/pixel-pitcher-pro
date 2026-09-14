@@ -622,6 +622,7 @@ function Index() {
             onSendScout={handleSendScout}
             onSignProspect={handleSignProspect}
             onDiscardProspect={handleDiscardProspect}
+            onSpendCoins={(amount) => patch((c) => ({ ...c, budget: c.budget - amount }))}
           />
         </div>
       </Suspense>

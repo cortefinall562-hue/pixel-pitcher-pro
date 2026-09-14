@@ -49,6 +49,9 @@ function cyl(r: number, h: number, color: number) {
   return new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 8), mat(color));
 }
 
+type Role = "gk" | "def" | "mid" | "fwd";
+type KickKind = "pass" | "power" | "finesse";
+
 interface Player {
   root: THREE.Group;
   legL: THREE.Group;
@@ -57,9 +60,25 @@ interface Player {
   armR: THREE.Group;
   vel: THREE.Vector3;
   phase: number;
+  /** tiempo restante de la animación de patada */
+  kickT: number;
+  kickDur: number;
+  kickKind: KickKind;
+  /** enfriamiento antes de volver a tocar la pelota */
+  cooldown: number;
+  role: Role;
+  home: THREE.Vector3;
+  /** 1 = ataca hacia +X, -1 = ataca hacia -X */
+  side: number;
 }
 
-function createPlayer(shirt: number, shorts: number): Player {
+function createPlayer(
+  shirt: number,
+  shorts: number,
+  role: Role = "mid",
+  home: THREE.Vector3 = new THREE.Vector3(),
+  side = 1,
+): Player {
   const root = new THREE.Group();
 
   const torso = box(0.8, 0.85, 0.45, shirt);
@@ -108,7 +127,23 @@ function createPlayer(shirt: number, shorts: number): Player {
   const legR = limb(1, false);
   root.add(armL, armR, legL, legR);
 
-  return { root, legL, legR, armL, armR, vel: new THREE.Vector3(), phase: Math.random() * 6 };
+  root.position.copy(home);
+  return {
+    root,
+    legL,
+    legR,
+    armL,
+    armR,
+    vel: new THREE.Vector3(),
+    phase: Math.random() * 6,
+    kickT: 0,
+    kickDur: 0.3,
+    kickKind: "pass",
+    cooldown: 0,
+    role,
+    home: home.clone(),
+    side,
+  };
 }
 
 export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) {
@@ -283,16 +318,31 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   scene.add(ball);
   const ballVel = new THREE.Vector3();
 
-  // ---- Jugadores ----
-  const hero = createPlayer(opts.teamShirt, opts.teamShorts);
-  hero.root.position.set(-4, 0, 2);
-  const mate = createPlayer(opts.teamShirt, opts.teamShorts);
-  mate.root.position.set(-9, 0, -5);
-  const rival1 = createPlayer(opts.rivalShirt, opts.rivalShorts);
-  rival1.root.position.set(5, 0, -3);
-  const rival2 = createPlayer(opts.rivalShirt, opts.rivalShorts);
-  rival2.root.position.set(9, 0, 4);
-  for (const p of [hero, mate, rival1, rival2]) scene.add(p.root);
+  // ---- Jugadores (equipo ataca hacia +X, rival hacia -X) ----
+  const teamP = (role: Role, x: number, z: number) =>
+    createPlayer(opts.teamShirt, opts.teamShorts, role, new THREE.Vector3(x, 0, z), 1);
+  const rivalP = (role: Role, x: number, z: number) =>
+    createPlayer(opts.rivalShirt, opts.rivalShorts, role, new THREE.Vector3(x, 0, z), -1);
+
+  const hero = teamP("mid", -4, 2);
+  const mate = teamP("fwd", 6, -5);
+  const mate2 = teamP("mid", -8, 5);
+  const back = teamP("def", -14, 0);
+  const keeper = teamP("gk", -FIELD_X + 1.1, 0);
+
+  const rival1 = rivalP("fwd", 5, -3);
+  const rival2 = rivalP("mid", 9, 4);
+  const rival3 = rivalP("def", 14, -1);
+  const rivalKeeper = rivalP("gk", FIELD_X - 1.1, 0);
+  rival1.root.rotation.y = Math.PI;
+  rival2.root.rotation.y = Math.PI;
+  rival3.root.rotation.y = Math.PI;
+  rivalKeeper.root.rotation.y = Math.PI;
+
+  const teamMates = [mate, mate2, back, keeper];
+  const rivals = [rival1, rival2, rival3, rivalKeeper];
+  const everyone = [hero, ...teamMates, ...rivals];
+  for (const p of everyone) scene.add(p.root);
 
   const marker = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.09, 6, 24), mat(0xfdf14a));
   marker.rotation.x = Math.PI / 2;
@@ -349,8 +399,9 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   // ---- Controles ----
   const keys = new Set<string>();
   const MOVE_KEYS = ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"];
-  const ACTION_KEYS = ["e", "f", "q", " "];
-  let wantShoot = false;
+  const ACTION_KEYS = ["e", "f", "q", " ", "shift"];
+  let wantPower = false;
+  let wantFinesse = false;
   let wantPass = false;
   let wantDodge = false;
 
@@ -358,11 +409,12 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     const k = e.key.toLowerCase();
     if (MOVE_KEYS.includes(k) || ACTION_KEYS.includes(k)) e.preventDefault();
     if (e.repeat) {
-      if (MOVE_KEYS.includes(k) || k === "f") keys.add(k);
+      if (MOVE_KEYS.includes(k) || k === "shift") keys.add(k);
       return;
     }
     if (MOVE_KEYS.includes(k) || ACTION_KEYS.includes(k)) keys.add(k);
-    if (k === "e") wantShoot = true;
+    if (k === "e") wantPower = true;
+    if (k === "f") wantFinesse = true;
     if (k === " ") wantPass = true;
     if (k === "q") wantDodge = true;
   };
@@ -376,6 +428,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   };
 
   function animateLimbs(p: Player, speed: number, dt: number) {
+    if (p.kickT > 0) return;
     p.phase += dt * (2.5 + speed * 4);
     const amp = Math.min(0.9, 0.12 + speed * 0.85);
     const s = Math.sin(p.phase * 2);
@@ -383,23 +436,70 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     p.legR.rotation.x = -s * amp;
     p.armL.rotation.x = -s * amp * 0.8;
     p.armR.rotation.x = s * amp * 0.8;
+    p.root.rotation.z = 0;
+    p.armL.rotation.z = 0;
+    p.armR.rotation.z = 0;
+  }
+
+  const KICK_DUR: Record<KickKind, number> = { pass: 0.26, power: 0.46, finesse: 0.34 };
+
+  /** Arranca la animación de golpeo; devuelve el retardo hasta el impacto. */
+  function startKick(p: Player, kind: KickKind) {
+    p.kickKind = kind;
+    p.kickDur = KICK_DUR[kind];
+    p.kickT = p.kickDur;
+    p.cooldown = kind === "pass" ? 0.3 : 0.5;
+  }
+
+  /** Pose de golpeo: amague de pierna, impacto y acompañamiento. */
+  function animateKickPose(p: Player, dt: number) {
+    if (p.kickT <= 0) return false;
+    p.kickT = Math.max(0, p.kickT - dt);
+    const u = 1 - p.kickT / p.kickDur;
+    const kind = p.kickKind;
+    const windup = kind === "power" ? 0.42 : kind === "finesse" ? 0.36 : 0.3;
+    const back = kind === "power" ? 1.35 : kind === "finesse" ? 0.85 : 0.6;
+    const through = kind === "power" ? -1.9 : kind === "finesse" ? -1.15 : -0.85;
+
+    if (u < windup) {
+      const w = u / windup;
+      p.legR.rotation.x = back * w;
+      p.root.rotation.z = (kind === "power" ? 0.16 : 0.06) * w;
+      p.armL.rotation.z = (kind === "power" ? -0.7 : -0.35) * w;
+      p.armR.rotation.z = (kind === "power" ? 0.5 : 0.25) * w;
+    } else {
+      const w = (u - windup) / (1 - windup);
+      p.legR.rotation.x = back + (through - back) * Math.min(1, w * 1.7);
+      p.root.rotation.z = (kind === "power" ? 0.16 : 0.06) * (1 - w);
+      p.root.rotation.x = kind === "power" ? -0.22 * (1 - w) : -0.08 * (1 - w);
+      p.armL.rotation.z = (kind === "power" ? -0.7 : -0.35) * (1 - w) - 0.4 * w;
+      p.armR.rotation.z = (kind === "power" ? 0.5 : 0.25) * (1 - w) + 0.4 * w;
+    }
+    // pierna de apoyo semiflexionada
+    p.legL.rotation.x = -0.22 - (kind === "power" ? 0.18 : 0.05);
+    p.armL.rotation.x = -0.5;
+    p.armR.rotation.x = 0.35;
+
+    if (p.kickT === 0) {
+      p.root.rotation.x = 0;
+      p.root.rotation.z = 0;
+    }
+    return true;
   }
 
   function celebrate(p: Player, t: number) {
-    p.root.position.y = Math.abs(Math.sin(t * 7)) * 0.9;
-    p.root.rotation.y += 0.09;
-    p.armL.rotation.x = 0;
-    p.armR.rotation.x = 0;
-    p.armL.rotation.z = 2.5;
-    p.armR.rotation.z = -2.5;
-    p.legL.rotation.x = 0.3;
-    p.legR.rotation.x = -0.3;
+    celebration.play(p, t);
   }
 
   function resetPose(p: Player) {
     p.root.position.y = 0;
-    p.armL.rotation.z = 0;
-    p.armR.rotation.z = 0;
+    p.root.rotation.x = 0;
+    p.root.rotation.z = 0;
+    p.armL.rotation.set(0, 0, 0);
+    p.armR.rotation.set(0, 0, 0);
+    p.legL.rotation.set(0, 0, 0);
+    p.legR.rotation.set(0, 0, 0);
+    p.kickT = 0;
   }
 
   function faceMove(p: Player, dt: number) {
@@ -412,24 +512,32 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     }
   }
 
-  function kick(from: THREE.Vector3, dir: THREE.Vector3, power: number) {
+  function faceTo(p: Player, target: THREE.Vector3, dt: number) {
+    const a = Math.atan2(target.x - p.root.position.x, target.z - p.root.position.z);
+    let diff = a - p.root.rotation.y;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    p.root.rotation.y += diff * Math.min(1, dt * 12);
+  }
+
+  function kick(from: THREE.Vector3, dir: THREE.Vector3, power: number, lift = 0) {
     const d = dir.lengthSq() > 0.001 ? dir.clone().normalize() : new THREE.Vector3(1, 0, 0);
     d.y = 0;
     ballVel.copy(d).multiplyScalar(power);
-    ball.position.x = from.x + d.x * (ballR + 0.45);
-    ball.position.z = from.z + d.z * (ballR + 0.45);
+    ballVel.y = lift;
+    ball.position.x = from.x + d.x * (ballR + 0.5);
+    ball.position.z = from.z + d.z * (ballR + 0.5);
   }
 
   function resetKickoff() {
     ball.position.set(0, ballR, 0);
     ballVel.set(0, 0, 0);
-    hero.root.position.set(-4, 0, 2);
-    mate.root.position.set(-9, 0, -5);
-    rival1.root.position.set(5, 0, -3);
-    rival2.root.position.set(9, 0, 4);
-    for (const p of [hero, mate, rival1, rival2]) {
+    for (const p of everyone) {
+      p.root.position.copy(p.home);
       p.vel.set(0, 0, 0);
+      p.cooldown = 0.4;
       resetPose(p);
+      p.root.rotation.y = p.side > 0 ? 0 : Math.PI;
     }
   }
 
