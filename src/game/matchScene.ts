@@ -72,7 +72,13 @@ interface Player {
   side: number;
 }
 
-function createPlayer(shirt: number, shorts: number): Player {
+function createPlayer(
+  shirt: number,
+  shorts: number,
+  role: Role = "mid",
+  home: THREE.Vector3 = new THREE.Vector3(),
+  side = 1,
+): Player {
   const root = new THREE.Group();
 
   const torso = box(0.8, 0.85, 0.45, shirt);
@@ -121,7 +127,23 @@ function createPlayer(shirt: number, shorts: number): Player {
   const legR = limb(1, false);
   root.add(armL, armR, legL, legR);
 
-  return { root, legL, legR, armL, armR, vel: new THREE.Vector3(), phase: Math.random() * 6 };
+  root.position.copy(home);
+  return {
+    root,
+    legL,
+    legR,
+    armL,
+    armR,
+    vel: new THREE.Vector3(),
+    phase: Math.random() * 6,
+    kickT: 0,
+    kickDur: 0.3,
+    kickKind: "pass",
+    cooldown: 0,
+    role,
+    home: home.clone(),
+    side,
+  };
 }
 
 export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) {
