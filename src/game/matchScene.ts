@@ -637,7 +637,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     if (keys.has("arrowright") || keys.has("d")) dir.x += 1;
     if (dir.lengthSq() > 0) dir.normalize();
 
-    const turbo = keys.has("f");
+    const turbo = keys.has("shift");
     const baseSpeed = turbo ? 13.5 : 9;
 
     // AMAGUE (Q): desplazamiento lateral rápido
