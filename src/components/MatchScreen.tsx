@@ -160,10 +160,11 @@ export default function MatchScreen({
 
       <div className="pointer-events-none absolute bottom-5 left-1/2 flex max-w-[92vw] flex-wrap justify-center gap-x-4 gap-y-1 -translate-x-1/2 rounded-xl bg-pitch-night/75 px-5 py-2 text-[11px] tracking-widest text-foreground backdrop-blur">
         <span>WASD / FLECHAS: MOVER</span>
-        <span className="text-turf">E: TIRO</span>
-        <span className="text-turf">F: TURBO</span>
-        <span className="text-turf">Q: AMAGUE</span>
+        <span className="text-turf">E: TIRO POTENTE</span>
+        <span className="text-turf">F: TIRO COLOCADO</span>
         <span className="text-turf">ESPACIO: PASE</span>
+        <span className="text-turf">Q: AMAGUE</span>
+        <span className="text-turf">SHIFT: TURBO</span>
       </div>
 
       {goalSide && (
