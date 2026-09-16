@@ -712,25 +712,47 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     const ballDist = hb.length();
     const nearBall = ballDist < 2.6;
 
-    if (wantShoot) {
-      wantShoot = false;
-      if (nearBall) {
-        const aim = new THREE.Vector3(FIELD_X - ball.position.x, 0, -ball.position.z * 0.5);
-        kick(hero.root.position, aim, 26);
+    // TIRO POTENTE (E)
+    if (wantPower) {
+      wantPower = false;
+      if (nearBall && hero.kickT <= 0) {
+        startKick(hero, "power");
+        faceTo(hero, new THREE.Vector3(FIELD_X, 0, ball.position.z * 0.4), 1);
+        const aim = new THREE.Vector3(FIELD_X - ball.position.x, 0, -ball.position.z * 0.45);
+        kick(hero.root.position, aim, 30, 2.2);
         opts.onEvent?.("shot");
       }
     }
 
+    // TIRO COLOCADO (F cerca de la pelota): más lento, busca el palo lejano
+    if (wantFinesse) {
+      wantFinesse = false;
+      if (nearBall && hero.kickT <= 0) {
+        startKick(hero, "finesse");
+        const post = ball.position.z >= 0 ? -GOAL_HALF * 0.7 : GOAL_HALF * 0.7;
+        const aim = new THREE.Vector3(FIELD_X - ball.position.x, 0, post - ball.position.z);
+        kick(hero.root.position, aim, 20, 1.1);
+        opts.onEvent?.("shot");
+      }
+    }
+
+    // PASE (Espacio): al compañero mejor ubicado
     if (wantPass) {
       wantPass = false;
-      if (nearBall) {
-        const aim = new THREE.Vector3().subVectors(mate.root.position, ball.position);
-        kick(hero.root.position, aim, 14);
+      if (nearBall && hero.kickT <= 0) {
+        const target = [mate, mate2, back].reduce((best, p) => {
+          const scoreOf = (q: Player) =>
+            q.root.position.x - q.root.position.distanceTo(hero.root.position) * 0.35;
+          return scoreOf(p) > scoreOf(best) ? p : best;
+        }, mate);
+        startKick(hero, "pass");
+        const aim = new THREE.Vector3().subVectors(target.root.position, ball.position);
+        kick(hero.root.position, aim, Math.min(22, 8 + aim.length() * 0.8));
       }
     }
 
     // conducción simple
-    if (ballDist < ballR + 0.75 && ballVel.length() < 20) {
+    if (hero.kickT <= 0 && ballDist < ballR + 0.85 && ballVel.length() < 20) {
       const heroSpeed = hero.vel.length();
       const kickDir = heroSpeed > 0.4 ? hero.vel.clone() : hb;
       kick(hero.root.position, kickDir, Math.max(6, heroSpeed * 2.2));
