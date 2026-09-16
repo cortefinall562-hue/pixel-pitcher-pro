@@ -396,6 +396,9 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     confetti.visible = true;
   }
 
+  // ---- Festejo elegido por el jugador ----
+  const celebration = selectedCelebration();
+
   // ---- Controles ----
   const keys = new Set<string>();
   const MOVE_KEYS = ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"];
