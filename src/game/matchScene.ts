@@ -649,11 +649,12 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       hero.root.rotation.y += dt * 18;
     }
 
-    hero.vel.lerp(dir.multiplyScalar(baseSpeed), Math.min(1, dt * 8));
+    hero.vel.lerp(dir.multiplyScalar(hero.kickT > 0 ? baseSpeed * 0.3 : baseSpeed), Math.min(1, dt * 8));
     hero.root.position.addScaledVector(hero.vel, dt);
     clamp(hero.root.position);
-    if (dodgeTimer <= 0) faceMove(hero, dt);
-    animateLimbs(hero, hero.vel.length() / 9, dt);
+    if (dodgeTimer <= 0 && hero.kickT <= 0) faceMove(hero, dt);
+    if (!animateKickPose(hero, dt)) animateLimbs(hero, hero.vel.length() / 9, dt);
+    hero.cooldown = Math.max(0, hero.cooldown - dt);
     marker.position.set(hero.root.position.x, 0.06, hero.root.position.z);
 
     // estela de turbo
@@ -677,33 +678,109 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       }
     }
 
-    // ---- IA ----
-    const chase = (p: Player, speed: number, goalX: number) => {
-      const toBall = new THREE.Vector3().subVectors(ball.position, p.root.position);
-      toBall.y = 0;
-      const d = toBall.length();
-      if (d > 0.1) toBall.divideScalar(d);
-      p.vel.lerp(toBall.multiplyScalar(speed), Math.min(1, dt * 3));
+    // ---- IA por rol ----
+    /** Objetivo táctico según rol: presiona la pelota o cubre su zona. */
+    const aiTarget = (p: Player, out: THREE.Vector3) => {
+      const attackX = p.side * FIELD_X;
+      const ownX = -p.side * FIELD_X;
+      const d = p.root.position.distanceTo(ball.position);
+      if (p.role === "gk") {
+        out.set(
+          ownX + p.side * 1.2,
+          0,
+          THREE.MathUtils.clamp(ball.position.z * 0.55, -GOAL_HALF, GOAL_HALF),
+        );
+        // sale a cortar si la pelota entra al área
+        if (Math.abs(ball.position.x - ownX) < 5 && Math.abs(ball.position.z) < GOAL_HALF + 1.5) {
+          out.copy(ball.position);
+        }
+        return;
+      }
+      const ballInOwnHalf = (ball.position.x - 0) * p.side < 0;
+      const pressing = d < 7 || (p.role === "def" && ballInOwnHalf) || (p.role !== "def" && !ballInOwnHalf);
+      if (pressing) {
+        out.copy(ball.position);
+        // se anticipa a la trayectoria del balón
+        out.addScaledVector(ballVel, 0.18);
+      } else {
+        out.set(
+          THREE.MathUtils.lerp(p.home.x, ball.position.x * 0.6, p.role === "fwd" ? 0.75 : 0.4),
+          0,
+          THREE.MathUtils.lerp(p.home.z, ball.position.z, 0.35),
+        );
+      }
+      // los delanteros abren la cancha buscando espacio
+      if (p.role === "fwd" && !pressing) out.x += p.side * 3;
+      out.x = THREE.MathUtils.clamp(out.x, -FIELD_X + 1, FIELD_X - 1);
+      void attackX;
+    };
+
+    const SPEED: Record<Role, number> = { gk: 5.5, def: 6.4, mid: 7, fwd: 7.4 };
+    const aiTmp = new THREE.Vector3();
+
+    /** Mueve, anima y resuelve el toque de un jugador controlado por la IA. */
+    const runAI = (p: Player) => {
+      p.cooldown = Math.max(0, p.cooldown - dt);
+      if (animateKickPose(p, dt)) {
+        p.vel.multiplyScalar(1 - Math.min(1, dt * 6));
+        p.root.position.addScaledVector(p.vel, dt);
+        return;
+      }
+      aiTarget(p, aiTmp);
+      const toTarget = aiTmp.sub(p.root.position);
+      toTarget.y = 0;
+      const dist = toTarget.length();
+      const speed = dist < 0.6 ? 0 : SPEED[p.role];
+      if (dist > 0.001) toTarget.divideScalar(dist);
+      p.vel.lerp(toTarget.multiplyScalar(speed), Math.min(1, dt * 4));
       p.root.position.addScaledVector(p.vel, dt);
       clamp(p.root.position);
       faceMove(p, dt);
       animateLimbs(p, p.vel.length() / 9, dt);
-      if (d < ballR + 0.7) {
-        const aim = new THREE.Vector3(goalX - ball.position.x, 0, -ball.position.z * 0.35);
-        kick(p.root.position, aim, 9);
+
+      const dBall = p.root.position.distanceTo(ball.position);
+      if (dBall < ballR + 0.9 && p.cooldown <= 0) {
+        const goalX = p.side * FIELD_X;
+        const close = Math.abs(goalX - ball.position.x) < 9;
+        const teammates = (p.side > 0 ? teamMates : rivals).filter((q) => q !== p && q.role !== "gk");
+        if (p.role === "gk") {
+          // despeje del arquero
+          const aim = new THREE.Vector3(p.side * 8, 0, (Math.random() - 0.5) * 10);
+          startKick(p, "power");
+          faceTo(p, ball.position, 1);
+          kick(p.root.position, aim, 24, 2);
+        } else if (close && p.role !== "def") {
+          const aim = new THREE.Vector3(goalX - ball.position.x, 0, -ball.position.z * 0.5);
+          startKick(p, Math.random() > 0.5 ? "power" : "finesse");
+          faceTo(p, ball.position, 1);
+          kick(p.root.position, aim, 22 + Math.random() * 6, 1.4);
+          if (p.side < 0) opts.onEvent?.("danger");
+        } else {
+          const mateT = teammates.sort(
+            (a, b) => (b.root.position.x - a.root.position.x) * p.side,
+          )[0];
+          const aim = mateT
+            ? new THREE.Vector3().subVectors(mateT.root.position, ball.position)
+            : new THREE.Vector3(goalX - ball.position.x, 0, 0);
+          startKick(p, "pass");
+          faceTo(p, ball.position, 1);
+          kick(p.root.position, aim, Math.min(20, 9 + aim.length() * 0.7));
+        }
       }
     };
+
     const remote = opts.net?.latest() ?? null;
-    if (remote) {
-      // El rival principal lo controla el otro jugador (eje espejado)
-      rival1.root.position.set(-remote.hx, 0, -remote.hz);
-      rival1.root.rotation.y = Math.PI;
-      animateLimbs(rival1, 0.7, dt);
-    } else {
-      chase(rival1, 4.4, -FIELD_X);
+    for (const p of teamMates) runAI(p);
+    for (const p of rivals) {
+      if (remote && p === rival1) {
+        // El rival principal lo controla el otro jugador (eje espejado)
+        p.root.position.set(-remote.hx, 0, -remote.hz);
+        p.root.rotation.y = Math.PI;
+        animateLimbs(p, 0.7, dt);
+        continue;
+      }
+      runAI(p);
     }
-    chase(rival2, 3.6, -FIELD_X);
-    chase(mate, 3.4, FIELD_X);
 
 
     // ---- acciones sobre la pelota ----
