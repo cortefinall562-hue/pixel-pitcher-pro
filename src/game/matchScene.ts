@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { selectedCelebration } from "./celebrations";
 
 export type MatchEvent = "kickoff" | "shot" | "danger" | "nearmiss";
 
