@@ -189,6 +189,7 @@ export default function SeasonHub({
   trophies,
   onCreateCup,
   onPlayCup,
+  onWatchCeremony,
   scouts,
   prospects,
   onSendScout,
@@ -215,6 +216,7 @@ export default function SeasonHub({
   trophies: number;
   onCreateCup: () => void;
   onPlayCup: (rivalName: string) => void;
+  onWatchCeremony: () => void;
   scouts: ScoutMission[];
   prospects: Prospect[];
   onSendScout: (regionId: string, focus: Position | "any") => void;
@@ -564,6 +566,10 @@ export default function SeasonHub({
             club={club}
             cup={cup}
             onCreate={onCreateCup}
+            onCeremony={() => {
+              setShowCup(false);
+              onWatchCeremony();
+            }}
             onPlay={(rivalName) => {
               setShowCup(false);
               onPlayCup(rivalName);

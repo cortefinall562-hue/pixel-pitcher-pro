@@ -97,12 +97,14 @@ export default function CupModal({
   cup,
   onCreate,
   onPlay,
+  onCeremony,
   onClose,
 }: {
   club: Club;
   cup: CupState | null;
   onCreate: () => void;
   onPlay: (rivalName: string) => void;
+  onCeremony?: () => void;
   onClose: () => void;
 }) {
   const next = cup ? playerMatch(cup, club.id) : null;
@@ -169,12 +171,19 @@ export default function CupModal({
                     El trofeo ya está en la sala de las copas. Inscribite en una nueva edición
                     cuando quieras.
                   </p>
-                  <button
-                    onClick={onCreate}
-                    className="btn-play mx-auto mt-5 flex items-center gap-3 px-8"
-                  >
-                    NUEVA EDICIÓN
-                  </button>
+                  <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                    {onCeremony && (
+                      <button
+                        onClick={onCeremony}
+                        className="btn-play flex items-center gap-3 px-8"
+                      >
+                        VER CEREMONIA
+                      </button>
+                    )}
+                    <button onClick={onCreate} className="btn-ghost flex items-center gap-3 px-8">
+                      NUEVA EDICIÓN
+                    </button>
+                  </div>
                 </div>
               )}
 

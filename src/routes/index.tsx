@@ -482,6 +482,18 @@ function Index() {
     if (cupMatch) {
       setCupMatch(false);
       let ceremonyData: CeremonyResult | null = null;
+      if (career?.cup) {
+        const preview = applyPlayerResult(career.cup, career.clubId, result.team, result.rival);
+        if (preview.champion === career.clubId) {
+          ceremonyData = {
+            club: getClub(career.clubId),
+            managerName: career.managerName,
+            rivalName: result.rivalName,
+            teamGoals: result.team,
+            rivalGoals: result.rival,
+          };
+        }
+      }
       patch((c) => {
         if (!c.cup) return c;
         const before = c.cup;
@@ -491,15 +503,6 @@ function Index() {
           cup.champion === c.clubId || !!playerMatch(cup, c.clubId);
         const prize = stillIn ? CUP_PRIZES[Math.min(round, CUP_PRIZES.length - 1)]! : 400_000;
         const champion = cup.champion === c.clubId;
-        if (champion) {
-          ceremonyData = {
-            club: getClub(c.clubId),
-            managerName: c.managerName,
-            rivalName: result.rivalName,
-            teamGoals: result.team,
-            rivalGoals: result.rival,
-          };
-        }
         return advanceScouting({
           ...c,
           cup,
@@ -659,6 +662,16 @@ function Index() {
             trophies={career.trophies}
             onCreateCup={handleCreateCup}
             onPlayCup={handlePlayCup}
+            onWatchCeremony={() => {
+              setCeremony({
+                club,
+                managerName: career.managerName,
+                rivalName: lastResult?.rivalName ?? "Rival",
+                teamGoals: lastResult?.team ?? 2,
+                rivalGoals: lastResult?.rival ?? 1,
+              });
+              setScreen("ceremony");
+            }}
             scouts={career.scouts}
             prospects={career.prospects}
             onSendScout={handleSendScout}
