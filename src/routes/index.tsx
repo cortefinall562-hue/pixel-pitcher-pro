@@ -491,6 +491,15 @@ function Index() {
           cup.champion === c.clubId || !!playerMatch(cup, c.clubId);
         const prize = stillIn ? CUP_PRIZES[Math.min(round, CUP_PRIZES.length - 1)]! : 400_000;
         const champion = cup.champion === c.clubId;
+        if (champion) {
+          ceremonyData = {
+            club: getClub(c.clubId),
+            managerName: c.managerName,
+            rivalName: result.rivalName,
+            teamGoals: result.team,
+            rivalGoals: result.rival,
+          };
+        }
         return advanceScouting({
           ...c,
           cup,
