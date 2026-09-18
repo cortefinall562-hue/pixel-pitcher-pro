@@ -482,6 +482,18 @@ function Index() {
     if (cupMatch) {
       setCupMatch(false);
       let ceremonyData: CeremonyResult | null = null;
+      if (career?.cup) {
+        const preview = applyPlayerResult(career.cup, career.clubId, result.team, result.rival);
+        if (preview.champion === career.clubId) {
+          ceremonyData = {
+            club: getClub(career.clubId),
+            managerName: career.managerName,
+            rivalName: result.rivalName,
+            teamGoals: result.team,
+            rivalGoals: result.rival,
+          };
+        }
+      }
       patch((c) => {
         if (!c.cup) return c;
         const before = c.cup;
