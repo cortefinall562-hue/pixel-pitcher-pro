@@ -481,6 +481,7 @@ function Index() {
 
     if (cupMatch) {
       setCupMatch(false);
+      let ceremonyData: CeremonyResult | null = null;
       patch((c) => {
         if (!c.cup) return c;
         const before = c.cup;
