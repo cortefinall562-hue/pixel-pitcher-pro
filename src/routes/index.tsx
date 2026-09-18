@@ -4,6 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react
 import type { BrowStyle, CoachConfig, HairColor, HairStyle, Outfit } from "@/game/coachScene";
 import { CLUBS, DEFAULT_CLUB_ID, clubsByLeague, formatBudget, getClub } from "@/game/clubs";
 import type { MatchResult } from "@/components/MatchScreen";
+import type { CeremonyResult } from "@/components/CeremonyScreen";
 import type { NegotiationOutcome } from "@/components/NegotiationScreen";
 import {
   buildSquad,
@@ -108,6 +109,7 @@ function Index() {
   const [online, setOnline] = useState<OnlineState>(emptyOnline);
   const [session, setSession] = useState<OnlineSession | null>(null);
   const [cupMatch, setCupMatch] = useState(false);
+  const [ceremony, setCeremony] = useState<CeremonyResult | null>(null);
 
   const editorClub = getClub(clubId);
   const club = getClub(career?.clubId ?? clubId);
