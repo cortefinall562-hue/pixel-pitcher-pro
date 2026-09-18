@@ -333,7 +333,7 @@ export function createCeremonyScene(
         confettiPositions[idx + 2] = confettiPositions[idx + 2]! + confettiVelocity[idx + 2]! * dt;
         if (confettiPositions[idx + 1]! < 0.3) confettiPositions[idx + 1] = 14 + Math.random() * 6;
       }
-      confettiGeo.attributes.position!.needsUpdate = true;
+      confettiGeo.attributes["position"]!.needsUpdate = true;
     }
 
     const cameraTarget = elapsed < 3.8

@@ -4,6 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react
 import type { BrowStyle, CoachConfig, HairColor, HairStyle, Outfit } from "@/game/coachScene";
 import { CLUBS, DEFAULT_CLUB_ID, clubsByLeague, formatBudget, getClub } from "@/game/clubs";
 import type { MatchResult } from "@/components/MatchScreen";
+import type { CeremonyResult } from "@/components/CeremonyScreen";
 import type { NegotiationOutcome } from "@/components/NegotiationScreen";
 import {
   buildSquad,
@@ -52,6 +53,7 @@ const SeasonHub = lazy(() => import("@/components/SeasonHub"));
 const MatchScreen = lazy(() => import("@/components/MatchScreen"));
 const NegotiationScreen = lazy(() => import("@/components/NegotiationScreen"));
 const PackOpeningScreen = lazy(() => import("@/components/PackOpeningScreen"));
+const CeremonyScreen = lazy(() => import("@/components/CeremonyScreen"));
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -72,7 +74,15 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Screen = "menu" | "settings" | "editor" | "season" | "match" | "negotiation" | "pack";
+type Screen =
+  | "menu"
+  | "settings"
+  | "editor"
+  | "season"
+  | "match"
+  | "negotiation"
+  | "pack"
+  | "ceremony";
 
 const HAIR_LABELS = ["Pelado", "Pelo corto de bloques", "Flequillo de bloques"];
 const BROW_LABELS = ["Normales", "Enojadas", "Gruesas"];
@@ -99,6 +109,7 @@ function Index() {
   const [online, setOnline] = useState<OnlineState>(emptyOnline);
   const [session, setSession] = useState<OnlineSession | null>(null);
   const [cupMatch, setCupMatch] = useState(false);
+  const [ceremony, setCeremony] = useState<CeremonyResult | null>(null);
 
   const editorClub = getClub(clubId);
   const club = getClub(career?.clubId ?? clubId);
@@ -470,6 +481,7 @@ function Index() {
 
     if (cupMatch) {
       setCupMatch(false);
+      let ceremonyData: CeremonyResult | null = null;
       patch((c) => {
         if (!c.cup) return c;
         const before = c.cup;
@@ -479,6 +491,15 @@ function Index() {
           cup.champion === c.clubId || !!playerMatch(cup, c.clubId);
         const prize = stillIn ? CUP_PRIZES[Math.min(round, CUP_PRIZES.length - 1)]! : 400_000;
         const champion = cup.champion === c.clubId;
+        if (champion) {
+          ceremonyData = {
+            club: getClub(c.clubId),
+            managerName: c.managerName,
+            rivalName: result.rivalName,
+            teamGoals: result.team,
+            rivalGoals: result.rival,
+          };
+        }
         return advanceScouting({
           ...c,
           cup,
@@ -506,7 +527,12 @@ function Index() {
           ],
         });
       });
-      setScreen("season");
+      if (ceremonyData) {
+        setCeremony(ceremonyData);
+        setScreen("ceremony");
+      } else {
+        setScreen("season");
+      }
       return;
     }
 
@@ -562,6 +588,22 @@ function Index() {
             card={pendingPack.card}
             club={club}
             onClaim={handleClaimCard}
+          />
+        </Suspense>
+      </ClientOnly>
+    );
+  }
+
+  if (screen === "ceremony" && ceremony) {
+    return (
+      <ClientOnly fallback={<div className="min-h-screen bg-pitch-night" />}>
+        <Suspense fallback={<div className="min-h-screen bg-pitch-night" />}>
+          <CeremonyScreen
+            result={ceremony}
+            onContinue={() => {
+              setCeremony(null);
+              setScreen("season");
+            }}
           />
         </Suspense>
       </ClientOnly>
