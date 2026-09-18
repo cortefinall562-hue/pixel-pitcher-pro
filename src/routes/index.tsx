@@ -594,6 +594,22 @@ function Index() {
     );
   }
 
+  if (screen === "ceremony" && ceremony) {
+    return (
+      <ClientOnly fallback={<div className="min-h-screen bg-pitch-night" />}>
+        <Suspense fallback={<div className="min-h-screen bg-pitch-night" />}>
+          <CeremonyScreen
+            result={ceremony}
+            onContinue={() => {
+              setCeremony(null);
+              setScreen("season");
+            }}
+          />
+        </Suspense>
+      </ClientOnly>
+    );
+  }
+
   if (screen === "match") {
     return (
       <ClientOnly fallback={<div className="min-h-screen bg-sky" />}>
