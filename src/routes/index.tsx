@@ -52,6 +52,7 @@ const SeasonHub = lazy(() => import("@/components/SeasonHub"));
 const MatchScreen = lazy(() => import("@/components/MatchScreen"));
 const NegotiationScreen = lazy(() => import("@/components/NegotiationScreen"));
 const PackOpeningScreen = lazy(() => import("@/components/PackOpeningScreen"));
+const CeremonyScreen = lazy(() => import("@/components/CeremonyScreen"));
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -72,7 +73,15 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Screen = "menu" | "settings" | "editor" | "season" | "match" | "negotiation" | "pack";
+type Screen =
+  | "menu"
+  | "settings"
+  | "editor"
+  | "season"
+  | "match"
+  | "negotiation"
+  | "pack"
+  | "ceremony";
 
 const HAIR_LABELS = ["Pelado", "Pelo corto de bloques", "Flequillo de bloques"];
 const BROW_LABELS = ["Normales", "Enojadas", "Gruesas"];
