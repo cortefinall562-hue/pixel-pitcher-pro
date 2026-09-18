@@ -527,7 +527,12 @@ function Index() {
           ],
         });
       });
-      setScreen("season");
+      if (ceremonyData) {
+        setCeremony(ceremonyData);
+        setScreen("ceremony");
+      } else {
+        setScreen("season");
+      }
       return;
     }
 
