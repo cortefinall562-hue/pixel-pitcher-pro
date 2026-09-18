@@ -566,6 +566,10 @@ export default function SeasonHub({
             club={club}
             cup={cup}
             onCreate={onCreateCup}
+            onCeremony={() => {
+              setShowCup(false);
+              onWatchCeremony();
+            }}
             onPlay={(rivalName) => {
               setShowCup(false);
               onPlayCup(rivalName);

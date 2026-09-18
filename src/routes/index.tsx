@@ -662,6 +662,16 @@ function Index() {
             trophies={career.trophies}
             onCreateCup={handleCreateCup}
             onPlayCup={handlePlayCup}
+            onWatchCeremony={() => {
+              setCeremony({
+                club,
+                managerName: career.managerName,
+                rivalName: lastResult?.rivalName ?? "Rival",
+                teamGoals: lastResult?.team ?? 2,
+                rivalGoals: lastResult?.rival ?? 1,
+              });
+              setScreen("ceremony");
+            }}
             scouts={career.scouts}
             prospects={career.prospects}
             onSendScout={handleSendScout}
