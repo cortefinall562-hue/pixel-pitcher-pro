@@ -325,6 +325,49 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   const fanYaw = new Float32Array(fanCount);
   const tmpFan = new THREE.Object3D();
   const tmpColor = new THREE.Color();
+  const fanOffset = new THREE.Vector3();
+
+  function placeFanPart(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    baseX: number,
+    baseY: number,
+    baseZ: number,
+    yaw: number,
+    localX: number,
+    localY: number,
+    localZ: number,
+    scaleX: number,
+    scaleY: number,
+    scaleZ: number,
+    rotX = 0,
+    rotZ = 0,
+  ) {
+    fanOffset.set(localX, localY, localZ).applyAxisAngle(THREE.Object3D.DEFAULT_UP, yaw);
+    tmpFan.position.set(baseX + fanOffset.x, baseY + fanOffset.y, baseZ + fanOffset.z);
+    tmpFan.rotation.set(rotX, yaw, rotZ);
+    tmpFan.scale.set(scaleX, scaleY, scaleZ);
+    tmpFan.updateMatrix();
+    mesh.setMatrixAt(index, tmpFan.matrix);
+  }
+
+  function poseFan(index: number, hop: number, cheer: number, time: number) {
+    const x = fanBase[index * 3]!;
+    const y = fanBase[index * 3 + 1]! + hop;
+    const z = fanBase[index * 3 + 2]!;
+    const yaw = fanYaw[index]!;
+    const size = fanScale[index]!;
+    const sway = Math.sin(time * 9 + fanPhase[index]!) * cheer * 0.2;
+    const armLift = cheer * (1.7 + Math.sin(time * 13 + fanPhase[index]!) * 0.3);
+    placeFanPart(crowdLegs, index, x, y, z, yaw, 0, -0.2, 0, size, size, size);
+    placeFanPart(crowdBody, index, x, y, z, yaw, 0, 0.25, 0, size, size, size, 0, sway);
+    placeFanPart(crowdHeads, index, x, y, z, yaw, 0, 0.85, 0, size, size, size, 0, -sway * 0.5);
+    placeFanPart(crowdEyes, index, x, y, z, yaw, 0, 0.91, 0.215, size, size, size);
+    placeFanPart(crowdMouths, index, x, y, z, yaw, 0, 0.76, 0.22, size, size * (1 + cheer * 2), size);
+    placeFanPart(crowdArmsL, index, x, y, z, yaw, -0.4, 0.25 + cheer * 0.2, 0, size, size, size, armLift, -0.15 - cheer * 0.45);
+    placeFanPart(crowdArmsR, index, x, y, z, yaw, 0.4, 0.25 + cheer * 0.2, 0, size, size, size, armLift, 0.15 + cheer * 0.45);
+  }
+
   for (let i = 0; i < fanCount; i++) {
     const s = seatRows[i]!;
     fanBase[i * 3] = s.x;
@@ -340,6 +383,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     crowdHeads.setColorAt(i, tmpColor.setHex(SKIN_TONES[i % SKIN_TONES.length]!));
     crowdArmsL.setColorAt(i, tmpColor.setHex(SKIN_TONES[i % SKIN_TONES.length]!));
     crowdArmsR.setColorAt(i, tmpColor.setHex(SKIN_TONES[i % SKIN_TONES.length]!));
+    poseFan(i, 0, 0, 0);
   }
   for (const part of crowdParts) {
     part.instanceMatrix.needsUpdate = true;
@@ -478,7 +522,8 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       confVel[i * 3] = (Math.random() - 0.5) * 1.6;
       confVel[i * 3 + 1] = -1.5 - Math.random() * 2;
       confVel[i * 3 + 2] = (Math.random() - 0.5) * 1.6;
-      tmpColor.setHex(FAN_COLORS[i % FAN_COLORS.length]!);
+      const confettiColors = [opts.teamShirt, opts.rivalShirt, ...FAN_ACCENTS];
+      tmpColor.setHex(confettiColors[i % confettiColors.length]!);
       confCol[i * 3] = tmpColor.r;
       confCol[i * 3 + 1] = tmpColor.g;
       confCol[i * 3 + 2] = tmpColor.b;
@@ -641,6 +686,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   let lastReported = -1;
   let finished = false;
   let celebrating = 0;
+  let celebratingSide: "team" | "rival" | null = null;
   let dodgeTimer = 0;
   const dodgeDir = new THREE.Vector3();
 
@@ -653,6 +699,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     opts.onScore(side);
     opts.onGoal?.(side);
     celebrating = CELEBRATION_TIME;
+    celebratingSide = side;
     ballVel.set(0, 0, 0);
     burstConfetti(hero.root.position);
   }
@@ -662,14 +709,26 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     const dt = Math.min(0.05, clock.getDelta());
     const t = clock.elapsedTime;
 
-    // hinchada saltando
+    // hinchada: ambiente durante el juego y locura por sectores después de un gol
     for (let i = 0; i < fanCount; i++) {
       const ph = fanPhase[i]!;
-      const hop = Math.max(0, Math.sin(t * 3 + ph)) * (celebrating > 0 ? 0.75 : 0.35);
-      tmpMat.makeTranslation(fanBase[i * 3]!, fanBase[i * 3 + 1]! + hop, fanBase[i * 3 + 2]!);
-      crowd.setMatrixAt(i, tmpMat);
+      const supportedSide = fanSupport[i] === 1 ? "team" : "rival";
+      const scoredForThem = celebratingSide === supportedSide;
+      const cheer = celebrating > 0 ? (scoredForThem ? 1 : 0.16) : 0;
+      const tempo = celebrating > 0 ? (scoredForThem ? 11 : 4) : 2.2;
+      const hop = Math.max(0, Math.sin(t * tempo + ph)) * (0.05 + cheer * 1.15);
+      poseFan(i, hop, cheer, t);
     }
-    crowd.instanceMatrix.needsUpdate = true;
+    for (const part of crowdParts) part.instanceMatrix.needsUpdate = true;
+
+    for (const flag of flags) {
+      const backsScorer = celebratingSide === flag.support;
+      const frenzy = celebrating > 0 ? (backsScorer ? 1 : 0.25) : 0;
+      const speed = 2.5 + frenzy * 8;
+      flag.root.rotation.z = Math.sin(t * speed + flag.phase) * (0.035 + frenzy * 0.14);
+      flag.cloth.rotation.y = Math.sin(t * speed * 1.3 + flag.phase) * (0.12 + frenzy * 0.38);
+      flag.cloth.rotation.z = Math.sin(t * speed + flag.phase) * (0.04 + frenzy * 0.12);
+    }
 
     // confeti
     if (confetti.visible) {
@@ -700,6 +759,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       marker.position.set(hero.root.position.x, 0.06, hero.root.position.z);
       renderer.render(scene, camera);
       if (celebrating <= 0) {
+        celebratingSide = null;
         resetPose(hero);
         hero.root.rotation.y = 0;
         resetKickoff();
