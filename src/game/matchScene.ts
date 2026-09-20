@@ -224,7 +224,14 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   const standMatA = mat(0x5a6472);
   const standMatB = mat(0x394456);
   const STAND_STEPS = 5;
-  const seatRows: { x: number; z: number; y: number }[] = [];
+  interface FanSeat {
+    x: number;
+    z: number;
+    y: number;
+    yaw: number;
+    support: "team" | "rival";
+  }
+  const seatRows: FanSeat[] = [];
 
   function buildStand(axis: "x" | "z", sign: number) {
     const long = axis === "x" ? (FIELD_Z + 8) * 2 : (FIELD_X + 8) * 2;
@@ -245,7 +252,14 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
         const t = -long / 2 + 0.7 + i * 1.35;
         const px = axis === "x" ? sign * off : t;
         const pz = axis === "x" ? t : sign * off;
-        seatRows.push({ x: px, z: pz, y: y + 0.45 });
+        const yaw = Math.atan2(-px, -pz);
+        seatRows.push({
+          x: px,
+          z: pz,
+          y: y + 0.45,
+          yaw,
+          support: px <= 0 ? "team" : "rival",
+        });
       }
     }
   }
@@ -254,34 +268,155 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   buildStand("z", -1);
   buildStand("z", 1);
 
-  // ---- Hinchada (InstancedMesh optimizado) ----
-  const FAN_COLORS = [
-    0xff4d4d, 0xffd93d, 0x4dd2ff, 0xffffff, 0x8affc1, 0xff8ae0, 0xffa64d, 0x9b8aff,
-  ];
+  // túneles, barandas y torres de iluminación
+  const railMat = mat(0xdce8ed);
+  for (const z of [-FIELD_Z - 5.8, FIELD_Z + 5.8]) {
+    const rail = box((FIELD_X + 6) * 2, 0.18, 0.18, 0xdce8ed);
+    rail.position.set(0, 1.15, z);
+    stands.add(rail);
+  }
+  for (const x of [-FIELD_X - 5.8, FIELD_X + 5.8]) {
+    const rail = box(0.18, 0.18, (FIELD_Z + 6) * 2, 0xdce8ed);
+    rail.position.set(x, 1.15, 0);
+    stands.add(rail);
+  }
+  const tunnel = box(4.2, 2.4, 3, 0x252d39);
+  tunnel.position.set(0, 1.2, FIELD_Z + 7.2);
+  stands.add(tunnel);
+  for (const x of [-FIELD_X - 7, FIELD_X + 7]) {
+    for (const z of [-FIELD_Z - 7, FIELD_Z + 7]) {
+      const mast = cyl(0.18, 15, 0x66737f);
+      mast.position.set(x, 7.5, z);
+      const lights = box(4.2, 1.3, 0.5, 0xf4f7d4);
+      lights.position.set(x, 14.5, z);
+      stands.add(mast, lights);
+    }
+  }
+  void railMat;
+
+  // ---- Hinchada proporcionada (InstancedMesh optimizado) ----
+  const FAN_ACCENTS = [0xffffff, 0xffd84a, 0x49b7ff, 0xff684f];
+  const SKIN_TONES = [0xf6c79e, 0xd99a6c, 0xa96543, 0x75432f];
   const fanCount = seatRows.length;
-  const crowd = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.55, 0.75, 0.55),
-    new THREE.MeshLambertMaterial(),
-    fanCount,
+  const makeCrowdPart = (geometry: THREE.BufferGeometry, material = new THREE.MeshLambertMaterial()) => {
+    const mesh = new THREE.InstancedMesh(geometry, material, fanCount);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(mesh);
+    return mesh;
+  };
+  const crowdBody = makeCrowdPart(new THREE.BoxGeometry(0.62, 0.72, 0.38));
+  const crowdLegs = makeCrowdPart(new THREE.BoxGeometry(0.5, 0.38, 0.34));
+  const crowdHeads = makeCrowdPart(new THREE.BoxGeometry(0.42, 0.42, 0.4));
+  const crowdArmsL = makeCrowdPart(new THREE.BoxGeometry(0.16, 0.58, 0.18));
+  const crowdArmsR = makeCrowdPart(new THREE.BoxGeometry(0.16, 0.58, 0.18));
+  const crowdEyes = makeCrowdPart(
+    new THREE.BoxGeometry(0.25, 0.055, 0.035),
+    new THREE.MeshLambertMaterial({ color: 0x20242a }),
   );
-  crowd.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const crowdMouths = makeCrowdPart(
+    new THREE.BoxGeometry(0.15, 0.045, 0.038),
+    new THREE.MeshLambertMaterial({ color: 0x713b3b }),
+  );
+  const crowdParts = [crowdBody, crowdLegs, crowdHeads, crowdArmsL, crowdArmsR, crowdEyes, crowdMouths];
   const fanPhase = new Float32Array(fanCount);
   const fanBase = new Float32Array(fanCount * 3);
-  const tmpMat = new THREE.Matrix4();
+  const fanScale = new Float32Array(fanCount);
+  const fanSupport = new Int8Array(fanCount);
+  const fanYaw = new Float32Array(fanCount);
+  const tmpFan = new THREE.Object3D();
   const tmpColor = new THREE.Color();
+  const fanOffset = new THREE.Vector3();
+
+  function placeFanPart(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    baseX: number,
+    baseY: number,
+    baseZ: number,
+    yaw: number,
+    localX: number,
+    localY: number,
+    localZ: number,
+    scaleX: number,
+    scaleY: number,
+    scaleZ: number,
+    rotX = 0,
+    rotZ = 0,
+  ) {
+    fanOffset.set(localX, localY, localZ).applyAxisAngle(THREE.Object3D.DEFAULT_UP, yaw);
+    tmpFan.position.set(baseX + fanOffset.x, baseY + fanOffset.y, baseZ + fanOffset.z);
+    tmpFan.rotation.set(rotX, yaw, rotZ);
+    tmpFan.scale.set(scaleX, scaleY, scaleZ);
+    tmpFan.updateMatrix();
+    mesh.setMatrixAt(index, tmpFan.matrix);
+  }
+
+  function poseFan(index: number, hop: number, cheer: number, time: number) {
+    const x = fanBase[index * 3]!;
+    const y = fanBase[index * 3 + 1]! + hop;
+    const z = fanBase[index * 3 + 2]!;
+    const yaw = fanYaw[index]!;
+    const size = fanScale[index]!;
+    const sway = Math.sin(time * 9 + fanPhase[index]!) * cheer * 0.2;
+    const armLift = cheer * (1.7 + Math.sin(time * 13 + fanPhase[index]!) * 0.3);
+    placeFanPart(crowdLegs, index, x, y, z, yaw, 0, -0.2, 0, size, size, size);
+    placeFanPart(crowdBody, index, x, y, z, yaw, 0, 0.25, 0, size, size, size, 0, sway);
+    placeFanPart(crowdHeads, index, x, y, z, yaw, 0, 0.85, 0, size, size, size, 0, -sway * 0.5);
+    placeFanPart(crowdEyes, index, x, y, z, yaw, 0, 0.91, 0.215, size, size, size);
+    placeFanPart(crowdMouths, index, x, y, z, yaw, 0, 0.76, 0.22, size, size * (1 + cheer * 2), size);
+    placeFanPart(crowdArmsL, index, x, y, z, yaw, -0.4, 0.25 + cheer * 0.2, 0, size, size, size, armLift, -0.15 - cheer * 0.45);
+    placeFanPart(crowdArmsR, index, x, y, z, yaw, 0.4, 0.25 + cheer * 0.2, 0, size, size, size, armLift, 0.15 + cheer * 0.45);
+  }
+
   for (let i = 0; i < fanCount; i++) {
     const s = seatRows[i]!;
     fanBase[i * 3] = s.x;
     fanBase[i * 3 + 1] = s.y;
     fanBase[i * 3 + 2] = s.z;
     fanPhase[i] = Math.random() * Math.PI * 2;
-    tmpMat.makeTranslation(s.x, s.y, s.z);
-    crowd.setMatrixAt(i, tmpMat);
-    crowd.setColorAt(i, tmpColor.setHex(FAN_COLORS[i % FAN_COLORS.length]!));
+    fanScale[i] = 0.86 + Math.random() * 0.22;
+    fanSupport[i] = s.support === "team" ? 1 : -1;
+    fanYaw[i] = s.yaw;
+    const shirt = s.support === "team" ? opts.teamShirt : opts.rivalShirt;
+    crowdBody.setColorAt(i, tmpColor.setHex(i % 5 === 0 ? FAN_ACCENTS[i % FAN_ACCENTS.length]! : shirt));
+    crowdLegs.setColorAt(i, tmpColor.setHex(i % 3 === 0 ? 0x263344 : 0x35475b));
+    crowdHeads.setColorAt(i, tmpColor.setHex(SKIN_TONES[i % SKIN_TONES.length]!));
+    crowdArmsL.setColorAt(i, tmpColor.setHex(SKIN_TONES[i % SKIN_TONES.length]!));
+    crowdArmsR.setColorAt(i, tmpColor.setHex(SKIN_TONES[i % SKIN_TONES.length]!));
+    poseFan(i, 0, 0, 0);
   }
-  crowd.instanceMatrix.needsUpdate = true;
-  if (crowd.instanceColor) crowd.instanceColor.needsUpdate = true;
-  scene.add(crowd);
+  for (const part of crowdParts) {
+    part.instanceMatrix.needsUpdate = true;
+    if (part.instanceColor) part.instanceColor.needsUpdate = true;
+  }
+
+  // ---- Banderas de ambas parcialidades ----
+  const flags: { root: THREE.Group; cloth: THREE.Mesh; phase: number; support: "team" | "rival" }[] = [];
+  const flagSpots = [
+    [-24, 5.8, -11], [-24, 7.8, -5], [-24, 6.8, 4], [-24, 8.7, 10],
+    [24, 5.8, -11], [24, 7.8, -5], [24, 6.8, 4], [24, 8.7, 10],
+    [-12, 7.6, -19], [-5, 5.7, -19], [6, 7.2, 19], [13, 6.2, 19],
+  ] as const;
+  for (let i = 0; i < flagSpots.length; i++) {
+    const [x, y, z] = flagSpots[i]!;
+    const support = x <= 0 ? "team" : "rival";
+    const root = new THREE.Group();
+    const pole = cyl(0.07, 3.1, 0xe6edf0);
+    pole.position.y = 1.3;
+    const cloth = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 1.25, 3, 1),
+      new THREE.MeshLambertMaterial({
+        color: support === "team" ? opts.teamShirt : opts.rivalShirt,
+        side: THREE.DoubleSide,
+      }),
+    );
+    cloth.position.set(1.2, 2.15, 0);
+    root.add(pole, cloth);
+    root.position.set(x, y, z);
+    root.rotation.y = Math.atan2(-x, -z);
+    flags.push({ root, cloth, phase: i * 0.73, support });
+    scene.add(root);
+  }
 
   // nubes
   const clouds = new THREE.Group();
@@ -387,7 +522,8 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       confVel[i * 3] = (Math.random() - 0.5) * 1.6;
       confVel[i * 3 + 1] = -1.5 - Math.random() * 2;
       confVel[i * 3 + 2] = (Math.random() - 0.5) * 1.6;
-      tmpColor.setHex(FAN_COLORS[i % FAN_COLORS.length]!);
+      const confettiColors = [opts.teamShirt, opts.rivalShirt, ...FAN_ACCENTS];
+      tmpColor.setHex(confettiColors[i % confettiColors.length]!);
       confCol[i * 3] = tmpColor.r;
       confCol[i * 3 + 1] = tmpColor.g;
       confCol[i * 3 + 2] = tmpColor.b;
@@ -550,6 +686,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
   let lastReported = -1;
   let finished = false;
   let celebrating = 0;
+  let celebratingSide: "team" | "rival" | null = null;
   let dodgeTimer = 0;
   const dodgeDir = new THREE.Vector3();
 
@@ -562,6 +699,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     opts.onScore(side);
     opts.onGoal?.(side);
     celebrating = CELEBRATION_TIME;
+    celebratingSide = side;
     ballVel.set(0, 0, 0);
     burstConfetti(hero.root.position);
   }
@@ -571,14 +709,26 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
     const dt = Math.min(0.05, clock.getDelta());
     const t = clock.elapsedTime;
 
-    // hinchada saltando
+    // hinchada: ambiente durante el juego y locura por sectores después de un gol
     for (let i = 0; i < fanCount; i++) {
       const ph = fanPhase[i]!;
-      const hop = Math.max(0, Math.sin(t * 3 + ph)) * (celebrating > 0 ? 0.75 : 0.35);
-      tmpMat.makeTranslation(fanBase[i * 3]!, fanBase[i * 3 + 1]! + hop, fanBase[i * 3 + 2]!);
-      crowd.setMatrixAt(i, tmpMat);
+      const supportedSide = fanSupport[i] === 1 ? "team" : "rival";
+      const scoredForThem = celebratingSide === supportedSide;
+      const cheer = celebrating > 0 ? (scoredForThem ? 1 : 0.16) : 0;
+      const tempo = celebrating > 0 ? (scoredForThem ? 11 : 4) : 2.2;
+      const hop = Math.max(0, Math.sin(t * tempo + ph)) * (0.05 + cheer * 1.15);
+      poseFan(i, hop, cheer, t);
     }
-    crowd.instanceMatrix.needsUpdate = true;
+    for (const part of crowdParts) part.instanceMatrix.needsUpdate = true;
+
+    for (const flag of flags) {
+      const backsScorer = celebratingSide === flag.support;
+      const frenzy = celebrating > 0 ? (backsScorer ? 1 : 0.25) : 0;
+      const speed = 2.5 + frenzy * 8;
+      flag.root.rotation.z = Math.sin(t * speed + flag.phase) * (0.035 + frenzy * 0.14);
+      flag.cloth.rotation.y = Math.sin(t * speed * 1.3 + flag.phase) * (0.12 + frenzy * 0.38);
+      flag.cloth.rotation.z = Math.sin(t * speed + flag.phase) * (0.04 + frenzy * 0.12);
+    }
 
     // confeti
     if (confetti.visible) {
@@ -609,6 +759,7 @@ export function createMatchScene(canvas: HTMLCanvasElement, opts: MatchOptions) 
       marker.position.set(hero.root.position.x, 0.06, hero.root.position.z);
       renderer.render(scene, camera);
       if (celebrating <= 0) {
+        celebratingSide = null;
         resetPose(hero);
         hero.root.rotation.y = 0;
         resetKickoff();
